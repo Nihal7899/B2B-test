@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, MapPin, Tag, Truck, Loader2, CheckCircle2, CreditCard, Banknote } from 'lucide-react';
+import { ArrowLeft, MapPin, Tag, Truck, Loader as Loader2, CircleCheck as CheckCircle2, CreditCard, Banknote } from 'lucide-react';
 import type { useCart } from '@/store';
 import type { DbAddress } from '@/services/catalog';
 import { fetchAddresses, placeOrder, clearCartItems } from '@/services/catalog';
@@ -52,8 +52,12 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
             order_id: payData.razorpay_order_id,
             name: 'Stackknit',
             description: 'Wholesale order',
-            handler: async () => {
-              await supabase.functions.invoke('razorpay', { body: { action: 'verify_payment', order_id: orderId, payment_id: payData.razorpay_order_id } });
+            handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
+              const verification = await supabase.functions.invoke('razorpay', { body: { action: 'verify_payment', order_id: orderId, payment_id: response.razorpay_payment_id, signature: response.razorpay_signature } });
+              if (verification.error || !verification.data?.verified) {
+                setError('Payment could not be verified. Please contact support before trying again.');
+                return;
+              }
               await clearCartItems(cart.cartId ?? '');
               cart.clearCart();
               onOrderPlaced(orderId);
