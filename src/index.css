@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-ink-100 text-ink-900 font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  * {
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .tap-highlight {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Smooth momentum scrolling on touch */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.scroll-snap-item {
+  scroll-snap-align: start;
+}
+
+/* Splash screen animations */
+@keyframes splash-logo-in {
+  0% { opacity: 0; transform: scale(0.6) translateY(12px); }
+  60% { opacity: 1; transform: scale(1.04) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes splash-word-in {
+  0% { opacity: 0; transform: translateY(14px); letter-spacing: 0.3em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: -0.02em; }
+}
+@keyframes splash-tag-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes splash-ring {
+  0% { transform: scale(0.7); opacity: 0; }
+  40% { opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes splash-bar {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+@keyframes splash-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes splash-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes splash-fade-out {
+  0% { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; }
+}
+.splash-logo-in { animation: splash-logo-in 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.splash-word-in { animation: splash-word-in 0.7s ease-out 0.25s both; }
+.splash-tag-in { animation: splash-tag-in 0.6s ease-out 0.45s both; }
+.splash-ring { animation: splash-ring 2s ease-out infinite; }
+.splash-bar { animation: splash-bar 2.2s ease-in-out 0.5s both; }
+.splash-float { animation: splash-float 3s ease-in-out infinite; }
+.splash-fade-out { animation: splash-fade-out 0.5s ease-in 2.4s forwards; }
+.splash-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  background-size: 200% 100%;
+  animation: splash-shimmer 2s linear infinite;
+}
