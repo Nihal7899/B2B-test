@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, Plus, Pencil, Trash2, X, Tag, LayoutGrid, Package, Users, Loader2, Save, Image as ImageIcon, Copy, ArrowUp, ArrowDown, Eye, Store, Award, LayoutDashboard } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { DbCategory, DbProduct, HomeBanner, Store, TrustedBrand } from '@/types';
+import type { DbCategory, DbProduct, HomeBanner, Store, TrustedBrand, DbPromotion, PromoBanner } from '@/types';
 import {
   fetchAllHomeBanners,
   createHomeBanner,
@@ -23,13 +23,14 @@ import type { ActionType } from '@/types';
 
 interface AdminScreenProps { onBack: () => void; }
 
-type Tab = 'dashboard' | 'banners' | 'stores' | 'brands' | 'categories' | 'products' | 'roles';
+type Tab = 'dashboard' | 'banners' | 'promotions' | 'stores' | 'brands' | 'categories' | 'products' | 'roles';
 
 export function AdminScreen({ onBack }: AdminScreenProps) {
   const [tab, setTab] = useState<Tab>('dashboard');
   const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'banners', label: 'Banners', icon: Tag },
+    { id: 'promotions', label: 'Promotions', icon: Tag },
     { id: 'stores', label: 'Stores', icon: Store },
     { id: 'brands', label: 'Brands', icon: Award },
     { id: 'categories', label: 'Categories', icon: LayoutGrid },
@@ -68,6 +69,7 @@ export function AdminScreen({ onBack }: AdminScreenProps) {
       <div className="flex-1 space-y-4">
         {tab === 'dashboard' && <Dashboard />}
         {tab === 'banners' && <BannersManager />}
+        {tab === 'promotions' && <PromotionsManager />}
         {tab === 'stores' && <StoresManager />}
         {tab === 'brands' && <BrandsManager />}
         {tab === 'categories' && <CategoriesManager />}
@@ -87,18 +89,18 @@ function Dashboard() {
         <p className="text-2xl font-extrabold text-ink-900 mt-1">—</p>
       </div>
       <div className="bg-white rounded-2xl p-5 border border-ink-100 shadow-card">
-        <p className="text-xs text-ink-400 font-bold uppercase">Stores</p>
+        <p className="text-xs text-ink-400 font-bold uppercase">Promotions</p>
         <p className="text-2xl font-extrabold text-ink-900 mt-1">—</p>
       </div>
       <div className="bg-white rounded-2xl p-5 border border-ink-100 shadow-card">
-        <p className="text-xs text-ink-400 font-bold uppercase">Brands</p>
+        <p className="text-xs text-ink-400 font-bold uppercase">Stores</p>
         <p className="text-2xl font-extrabold text-ink-900 mt-1">—</p>
       </div>
     </div>
   );
 }
 
-// ----- BannersManager -----
+// ----- BannersManager (for top, middle, bottom banners) -----
 const ACTION_TYPES: ActionType[] = [
   'VIEW_CATEGORY', 'VIEW_PRODUCT', 'VIEW_BRAND', 'VIEW_OFFER', 'SEARCH',
   'FILTER_PRODUCTS', 'OPEN_SMART_COLLECTION', 'OPEN_CART', 'OPEN_ORDERS',
@@ -365,8 +367,8 @@ function BannerForm({ initial, onClose, onSaved }: { initial: HomeBanner | null;
         <label className="block text-xs font-bold text-ink-600 mb-1">Position</label>
         <select value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
           <option value="top">Top (rectangular ad – promo code)</option>
-          <option value="middle">Middle (inside content)</option>
-          <option value="bottom">Bottom</option>
+          <option value="middle">Middle (action button banner)</option>
+          <option value="bottom">Bottom (action button banner)</option>
         </select>
       </div>
 
@@ -394,84 +396,90 @@ function BannerForm({ initial, onClose, onSaved }: { initial: HomeBanner | null;
         </>
       )}
 
-      <div>
-        <label className="block text-xs font-bold text-ink-600 mb-1">Action type</label>
-        <select value={form.action_type} onChange={(e) => setForm({ ...form, action_type: e.target.value as ActionType, action_config: {} })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
-          {ACTION_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-        </select>
-      </div>
-      {needsScreen && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Screen</label>
-          <select value={(form.action_config.screen as string) ?? ''} onChange={(e) => setActionConfig('screen', e.target.value)} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
-            <option value="">Select screen</option>
-            <option value="home">Home</option><option value="categories">Categories</option><option value="cart">Cart</option><option value="orders">Orders</option><option value="wishlist">Wishlist</option><option value="addresses">Addresses</option><option value="account">Account</option><option value="businessRegistration">Business registration</option>
-          </select>
-        </div>
-      )}
-      {needsUrl && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">External URL</label>
-          <input value={(form.action_config.url as string) ?? ''} onChange={(e) => setActionConfig('url', e.target.value)} placeholder="https://..." className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
-        </div>
-      )}
-      {needsSearch && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Search query</label>
-          <input value={(form.action_config.query as string) ?? ''} onChange={(e) => setActionConfig('query', e.target.value)} placeholder="e.g. basmati" className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
-        </div>
-      )}
-      {needsProduct && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Product</label>
-          <select value={(form.action_config.product_id as string) ?? ''} onChange={(e) => { setActionConfig('product_id', e.target.value); const p = products.find((x) => x.id === e.target.value); if (p) setActionConfig('product_name', `${p.brand} ${p.name}`); }} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
-            <option value="">Select product</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.brand} {p.name}</option>)}
-          </select>
-        </div>
-      )}
-      {needsCategory && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Categories</label>
-          <select multiple value={(form.action_config.category_ids as string[]) ?? []} onChange={(e) => setActionConfig('category_ids', Array.from(e.target.selectedOptions).map((o) => o.value))} className="w-full h-24 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" size={4}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-      )}
-      {needsBrand && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Brands</label>
-          <select multiple value={(form.action_config.brand_ids as string[]) ?? []} onChange={(e) => setActionConfig('brand_ids', Array.from(e.target.selectedOptions).map((o) => o.value))} className="w-full h-24 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" size={4}>
-            {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-          </select>
-        </div>
-      )}
-      {needsSmartCollection && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Smart Collection</label>
-          <select value={(form.action_config.collection_id as string) ?? ''} onChange={(e) => { const sc = smartCollections.find((x) => x.id === e.target.value); setActionConfig('collection_id', e.target.value); if (sc) setActionConfig('name', sc.name); }} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
-            <option value="">Select collection</option>
-            {smartCollections.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
-          </select>
-        </div>
-      )}
-      {needsFilter && (
-        <div>
-          <label className="block text-xs font-bold text-ink-600 mb-1">Filter options</label>
-          <div className="rounded-xl border border-ink-100 p-3 bg-ink-50/30 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" value={(form.action_config.discount_min as number) ?? ''} onChange={(e) => setActionConfig('discount_min', e.target.value ? Number(e.target.value) : null)} placeholder="Min discount %" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
-              <input type="number" value={(form.action_config.discount_max as number) ?? ''} onChange={(e) => setActionConfig('discount_max', e.target.value ? Number(e.target.value) : null)} placeholder="Max discount %" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
-              <input type="number" value={(form.action_config.price_min as number) ?? ''} onChange={(e) => setActionConfig('price_min', e.target.value ? Number(e.target.value) : null)} placeholder="Min price" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
-              <input type="number" value={(form.action_config.price_max as number) ?? ''} onChange={(e) => setActionConfig('price_max', e.target.value ? Number(e.target.value) : null)} placeholder="Max price" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={(form.action_config.stock_only as boolean) ?? false} onChange={(e) => setActionConfig('stock_only', e.target.checked)} className="accent-brand-600" /> In stock only</label>
-            <select value={(form.action_config.sort as string) ?? 'newest'} onChange={(e) => setActionConfig('sort', e.target.value)} className="w-full h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500">
-              <option value="newest">Newest</option><option value="discount_desc">Discount: high to low</option><option value="discount_asc">Discount: low to high</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="rating_desc">Top rated</option>
+      {/* Action config fields – for middle and bottom banners */}
+      {(form.position === 'middle' || form.position === 'bottom') && (
+        <>
+          <div>
+            <label className="block text-xs font-bold text-ink-600 mb-1">Action type</label>
+            <select value={form.action_type} onChange={(e) => setForm({ ...form, action_type: e.target.value as ActionType, action_config: {} })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
+              {ACTION_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
             </select>
           </div>
-        </div>
+          {needsScreen && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Screen</label>
+              <select value={(form.action_config.screen as string) ?? ''} onChange={(e) => setActionConfig('screen', e.target.value)} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
+                <option value="">Select screen</option>
+                <option value="home">Home</option><option value="categories">Categories</option><option value="cart">Cart</option><option value="orders">Orders</option><option value="wishlist">Wishlist</option><option value="addresses">Addresses</option><option value="account">Account</option><option value="businessRegistration">Business registration</option>
+              </select>
+            </div>
+          )}
+          {needsUrl && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">External URL</label>
+              <input value={(form.action_config.url as string) ?? ''} onChange={(e) => setActionConfig('url', e.target.value)} placeholder="https://..." className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+            </div>
+          )}
+          {needsSearch && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Search query</label>
+              <input value={(form.action_config.query as string) ?? ''} onChange={(e) => setActionConfig('query', e.target.value)} placeholder="e.g. basmati" className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+            </div>
+          )}
+          {needsProduct && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Product</label>
+              <select value={(form.action_config.product_id as string) ?? ''} onChange={(e) => { setActionConfig('product_id', e.target.value); const p = products.find((x) => x.id === e.target.value); if (p) setActionConfig('product_name', `${p.brand} ${p.name}`); }} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
+                <option value="">Select product</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.brand} {p.name}</option>)}
+              </select>
+            </div>
+          )}
+          {needsCategory && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Categories</label>
+              <select multiple value={(form.action_config.category_ids as string[]) ?? []} onChange={(e) => setActionConfig('category_ids', Array.from(e.target.selectedOptions).map((o) => o.value))} className="w-full h-24 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" size={4}>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+          {needsBrand && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Brands</label>
+              <select multiple value={(form.action_config.brand_ids as string[]) ?? []} onChange={(e) => setActionConfig('brand_ids', Array.from(e.target.selectedOptions).map((o) => o.value))} className="w-full h-24 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" size={4}>
+                {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+          )}
+          {needsSmartCollection && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Smart Collection</label>
+              <select value={(form.action_config.collection_id as string) ?? ''} onChange={(e) => { const sc = smartCollections.find((x) => x.id === e.target.value); setActionConfig('collection_id', e.target.value); if (sc) setActionConfig('name', sc.name); }} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
+                <option value="">Select collection</option>
+                {smartCollections.map((sc) => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+              </select>
+            </div>
+          )}
+          {needsFilter && (
+            <div>
+              <label className="block text-xs font-bold text-ink-600 mb-1">Filter options</label>
+              <div className="rounded-xl border border-ink-100 p-3 bg-ink-50/30 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" value={(form.action_config.discount_min as number) ?? ''} onChange={(e) => setActionConfig('discount_min', e.target.value ? Number(e.target.value) : null)} placeholder="Min discount %" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
+                  <input type="number" value={(form.action_config.discount_max as number) ?? ''} onChange={(e) => setActionConfig('discount_max', e.target.value ? Number(e.target.value) : null)} placeholder="Max discount %" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
+                  <input type="number" value={(form.action_config.price_min as number) ?? ''} onChange={(e) => setActionConfig('price_min', e.target.value ? Number(e.target.value) : null)} placeholder="Min price" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
+                  <input type="number" value={(form.action_config.price_max as number) ?? ''} onChange={(e) => setActionConfig('price_max', e.target.value ? Number(e.target.value) : null)} placeholder="Max price" className="h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500" />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={(form.action_config.stock_only as boolean) ?? false} onChange={(e) => setActionConfig('stock_only', e.target.checked)} className="accent-brand-600" /> In stock only</label>
+                <select value={(form.action_config.sort as string) ?? 'newest'} onChange={(e) => setActionConfig('sort', e.target.value)} className="w-full h-9 rounded-lg border border-ink-200 px-2 text-sm outline-none focus:border-brand-500">
+                  <option value="newest">Newest</option><option value="discount_desc">Discount: high to low</option><option value="discount_asc">Discount: low to high</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option><option value="rating_desc">Top rated</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </>
       )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-bold text-ink-600 mb-1">Start date</label>
@@ -493,6 +501,140 @@ function BannerForm({ initial, onClose, onSaved }: { initial: HomeBanner | null;
       </div>
       <button onClick={handleSave} disabled={saving || !form.title || !form.image_url} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
         {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save banner</>}
+      </button>
+    </div>
+  );
+}
+
+// ----- PromotionsManager (for carousel) -----
+function PromotionsManager() {
+  const [promos, setPromos] = useState<DbPromotion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<DbPromotion | null>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from('promotions').select('*').order('sort_order');
+    setPromos((data as DbPromotion[]) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('promotions').delete().eq('id', id);
+    void load();
+  };
+
+  const handleToggle = async (promo: DbPromotion) => {
+    await supabase.from('promotions').update({ is_active: !promo.is_active }).eq('id', promo.id);
+    void load();
+  };
+
+  if (loading) return <Loader2 className="animate-spin mx-auto text-brand-600" size={24} />;
+
+  return (
+    <div className="space-y-3">
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add promotion
+      </button>
+      {showForm && <PromotionForm initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
+      {promos.map((promo) => (
+        <div key={promo.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3">
+                {promo.image_url && <img src={promo.image_url} alt="" className="h-12 w-12 rounded-xl object-cover" />}
+                <div>
+                  <p className="text-sm font-bold text-ink-800 truncate">{promo.headline}</p>
+                  <p className="text-xs text-ink-500 truncate">{promo.subtext}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className={`text-[10px] font-bold rounded-full px-2.5 py-0.5 ${promo.is_active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>
+                  {promo.is_active ? 'ACTIVE' : 'HIDDEN'}
+                </span>
+                <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">Order: {promo.sort_order}</span>
+                <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">{promo.badge || 'No badge'}</span>
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => void handleToggle(promo)} className="h-8 w-8 rounded-lg bg-ink-50 text-ink-600 flex items-center justify-center text-xs font-bold">{promo.is_active ? 'ON' : 'OFF'}</button>
+              <button onClick={() => { setEditing(promo); setShowForm(true); }} className="h-8 w-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center"><Pencil size={14} /></button>
+              <button onClick={() => void handleDelete(promo.id)} className="h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ----- PromotionForm -----
+function PromotionForm({ initial, onClose, onSaved }: { initial: DbPromotion | null; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    headline: initial?.headline ?? '',
+    subtext: initial?.subtext ?? '',
+    cta_label: initial?.cta_label ?? 'Shop now',
+    image_url: initial?.image_url ?? '',
+    background: initial?.background ?? 'brand',
+    badge: initial?.badge ?? '',
+    sort_order: initial?.sort_order ?? 0,
+    is_active: initial?.is_active ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    if (initial) {
+      await supabase.from('promotions').update(form).eq('id', initial.id);
+    } else {
+      await supabase.from('promotions').insert(form);
+    }
+    setSaving(false);
+    onSaved();
+  };
+
+  return (
+    <div className="bg-white border border-brand-200 rounded-2xl p-4 space-y-4 shadow-card">
+      <div className="flex items-center justify-between"><h3 className="text-sm font-bold text-ink-900">{initial ? 'Edit' : 'New'} promotion</h3><button onClick={onClose}><X size={16} className="text-ink-400" /></button></div>
+      <div>
+        <label className="block text-xs font-bold text-ink-600 mb-1">Headline *</label>
+        <input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} placeholder="e.g. Bulk Orders, Better Prices" className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-ink-600 mb-1">Subtext</label>
+        <input value={form.subtext} onChange={(e) => setForm({ ...form, subtext: e.target.value })} placeholder="Short description" className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-ink-600 mb-1">Image URL *</label>
+        <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-ink-600 mb-1">CTA Label</label>
+          <input value={form.cta_label} onChange={(e) => setForm({ ...form, cta_label: e.target.value })} placeholder="e.g. Order Now" className="h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-ink-600 mb-1">Badge</label>
+          <input value={form.badge} onChange={(e) => setForm({ ...form, badge: e.target.value })} placeholder="e.g. WHOLESALE" className="h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-ink-600 mb-1">Background</label>
+          <select value={form.background} onChange={(e) => setForm({ ...form, background: e.target.value })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
+            <option value="brand">Brand green</option><option value="accent">Accent</option><option value="ink">Dark</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-ink-600 mb-1">Sort order</label>
+          <input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
+        </div>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
+      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save</>}
       </button>
     </div>
   );

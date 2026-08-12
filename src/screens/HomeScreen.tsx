@@ -15,6 +15,7 @@ import {
   fetchCategories,
   fetchProducts,
   fetchHomeBanners,
+  fetchPromotions,
   fetchStores,
   fetchTrustedBrands,
 } from '@/services/catalog';
@@ -42,34 +43,38 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [banners, setBanners] = useState<PromoBanner[]>([]);
+  const [carouselBanners, setCarouselBanners] = useState<PromoBanner[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [brands, setBrands] = useState<TrustedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [topBanner, setTopBanner] = useState<PromoBanner | null>(null);
   const [middleBanner, setMiddleBanner] = useState<PromoBanner | null>(null);
+  const [bottomBanner, setBottomBanner] = useState<PromoBanner | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [catRes, prodRes, bannerRes, storesRes, brandsRes] = await Promise.all([
+        const [catRes, prodRes, homeBanners, promoBanners, storesRes, brandsRes] = await Promise.all([
           fetchCategories(),
           fetchProducts(),
           fetchHomeBanners(),
+          fetchPromotions(),
           fetchStores(),
           fetchTrustedBrands(),
         ]);
         setCategories(catRes.categories);
         setProducts(prodRes.products);
-        setBanners(bannerRes);
+        setCarouselBanners(promoBanners);
         setStores(storesRes);
         setBrands(brandsRes);
 
-        // Strictly separate by position
-        const top = bannerRes.find((b) => b.position === 'top') || null;
-        const middle = bannerRes.find((b) => b.position === 'middle') || null;
+        // Get banners by position
+        const top = homeBanners.find((b) => b.position === 'top') || null;
+        const middle = homeBanners.find((b) => b.position === 'middle') || null;
+        const bottom = homeBanners.find((b) => b.position === 'bottom') || null;
         setTopBanner(top);
         setMiddleBanner(middle);
+        setBottomBanner(bottom);
       } catch (err) {
         console.error('Failed to load catalog', err);
       }
@@ -97,11 +102,23 @@ export function HomeScreen({
     onViewAll,
   };
 
-  // Map background color names to Tailwind classes (for middle banner)
+  // Map background color names to Tailwind classes
   const bgMap: Record<string, string> = {
     brand: 'bg-brand-50',
     accent: 'bg-accent-50',
     ink: 'bg-ink-50',
+  };
+
+  const borderMap: Record<string, string> = {
+    brand: 'border-brand-100',
+    accent: 'border-accent-100',
+    ink: 'border-ink-100',
+  };
+
+  const accentTextMap: Record<string, string> = {
+    brand: 'text-brand-700',
+    accent: 'text-accent-700',
+    ink: 'text-ink-700',
   };
 
   if (loading)
@@ -115,16 +132,12 @@ export function HomeScreen({
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
 
-      {/* TOP AD BANNER – rectangular promo code banner */}
+      {/* TOP AD BANNER – rectangular promo code banner (no action button) */}
       {!query && topBanner && <PromoAdBanner banner={topBanner} />}
 
-      {/* PROMO CAROUSEL – only banners not assigned to top or middle */}
-      {!query && banners.length > 0 && (
-        <PromoCarousel
-          banners={banners.filter(
-            (b) => b.position !== 'top' && b.position !== 'middle'
-          )}
-        />
+      {/* PROMO CAROUSEL – action button banners from promotions table */}
+      {!query && carouselBanners.length > 0 && (
+        <PromoCarousel banners={carouselBanners} onAction={onBannerAction} />
       )}
 
       {query ? (
@@ -239,11 +252,11 @@ export function HomeScreen({
             <ProductCarousel title="Popular Products" products={popular} {...actions} />
           )}
 
-          {/* MIDDLE AD BANNER – with proper background color */}
+          {/* MIDDLE ACTION BUTTON BANNER – from home_banners with position 'middle' */}
           {middleBanner && (
             <section className="px-4">
               <div
-                className={`relative overflow-hidden rounded-2xl min-h-[116px] flex items-center border border-${middleBanner.background_color || 'accent'}-100`}
+                className={`relative overflow-hidden rounded-2xl min-h-[116px] flex items-center border ${borderMap[middleBanner.background_color] || 'border-accent-100'}`}
               >
                 <div
                   className={`absolute inset-0 ${
@@ -252,7 +265,9 @@ export function HomeScreen({
                 />
                 <div className="p-4 relative z-10 w-[65%]">
                   {middleBanner.badge && (
-                    <span className="text-[9px] font-bold text-accent-700 tracking-wider uppercase">
+                    <span
+                      className={`text-[9px] font-bold ${accentTextMap[middleBanner.background_color] || 'text-accent-700'} tracking-wider uppercase`}
+                    >
                       {middleBanner.badge}
                     </span>
                   )}
@@ -317,23 +332,36 @@ export function HomeScreen({
             <ProductCarousel title="Everyday Essentials" products={essentials} {...actions} />
           )}
 
-          {/* Bottom CTA */}
-          <section className="mx-4 rounded-2xl bg-brand-950 p-5 text-white flex items-center justify-between overflow-hidden relative">
-            <div className="relative z-10">
-              <p className="text-[9px] text-brand-300 font-bold tracking-widest uppercase">
-                BUILT FOR BUSINESS
-              </p>
-              <h3 className="text-lg font-extrabold mt-1">Stock up. Save big.</h3>
-              <p className="text-[11px] text-brand-200 mt-1.5">
-                Your reliable partner for every restock.
-              </p>
-              <button className="mt-3 flex items-center gap-1 text-xs font-bold bg-white text-brand-900 px-3 py-1.5 rounded-lg">
-                Learn more <ArrowRight size={13} />
-              </button>
-            </div>
-            <div className="absolute -right-8 -bottom-10 h-36 w-36 rounded-full bg-brand-700/40" />
-            <div className="absolute right-4 top-4 h-16 w-16 rounded-full bg-brand-600/30" />
-          </section>
+          {/* BOTTOM ACTION BUTTON BANNER – from home_banners with position 'bottom' */}
+          {bottomBanner && (
+            <section className="mx-4 rounded-2xl p-5 text-white flex items-center justify-between overflow-hidden relative">
+              <div className="absolute inset-0">
+                <div className={`absolute inset-0 ${bgMap[bottomBanner.background_color] || 'bg-brand-950'}`} />
+                {bottomBanner.image && (
+                  <img
+                    src={bottomBanner.image}
+                    alt={bottomBanner.headline}
+                    className="absolute right-0 top-0 h-full w-[44%] object-cover opacity-30"
+                  />
+                )}
+                <div className="absolute -right-8 -bottom-10 h-36 w-36 rounded-full bg-white/10" />
+                <div className="absolute right-4 top-4 h-16 w-16 rounded-full bg-white/5" />
+              </div>
+              <div className="relative z-10 flex-1">
+                <p className="text-[9px] text-white/60 font-bold tracking-widest uppercase">
+                  {bottomBanner.badge || 'BUILT FOR BUSINESS'}
+                </p>
+                <h3 className="text-lg font-extrabold mt-1 text-white">{bottomBanner.headline}</h3>
+                <p className="text-[11px] text-white/70 mt-1.5">{bottomBanner.subtext}</p>
+                <button
+                  onClick={() => onBannerAction?.(bottomBanner)}
+                  className="mt-3 flex items-center gap-1 text-xs font-bold bg-white text-brand-900 px-3 py-1.5 rounded-lg"
+                >
+                  {bottomBanner.cta || 'Learn more'} <ArrowRight size={13} />
+                </button>
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>
