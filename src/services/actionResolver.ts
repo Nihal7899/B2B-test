@@ -1,5 +1,6 @@
 // services/actionResolver.ts
 import type { ActionType, FilterConfig, Category, Product, PromoBanner, ScreenName } from '@/types';
+import { fetchSmartCollectionById } from './catalog'; // ✅ import the function
 
 export interface ActionContext {
   setScreen: (screen: ScreenName) => void;
@@ -26,7 +27,6 @@ export async function handleHomeAction(
       const categoryIds = config.category_ids as string[];
       const categoryName = config.category_name as string || 'Category';
 
-      // If we have an array of category IDs, use them all
       if (categoryIds && Array.isArray(categoryIds) && categoryIds.length > 0) {
         ctx.setFilterConfig({ category_ids: categoryIds });
         ctx.setFilterTitle(categoryName || 'Categories');
@@ -45,7 +45,6 @@ export async function handleHomeAction(
       const productId = config.product_id as string;
       const productName = config.product_name as string || '';
       if (productId) {
-        // Fallback: search by product name or ID
         ctx.setSearch(productName || productId);
         ctx.setScreen('home');
       }
@@ -115,22 +114,26 @@ export async function handleHomeAction(
       break;
     }
 
-  case 'OPEN_SMART_COLLECTION': {
-    const collectionId = config.collection_id as string;
-    const collectionName = config.name as string || 'Collection';
-    if (collectionId) {
-      // Fetch the collection's filter config and apply it
-      const collection = await fetchSmartCollectionById(collectionId);
-      if (collection) {
-        ctx.setFilterConfig(collection.filter_config);
-        ctx.setFilterTitle(collection.name);
-        ctx.setScreen('filteredProducts');
-      } else {
-        console.warn('Smart collection not found:', collectionId);
+    case 'OPEN_SMART_COLLECTION': {
+      const collectionId = config.collection_id as string;
+      const collectionName = config.name as string || 'Collection';
+      if (collectionId) {
+        // ✅ Fetch the collection's filter config
+        try {
+          const collection = await fetchSmartCollectionById(collectionId);
+          if (collection) {
+            ctx.setFilterConfig(collection.filter_config);
+            ctx.setFilterTitle(collection.name);
+            ctx.setScreen('filteredProducts');
+          } else {
+            console.warn('Smart collection not found:', collectionId);
+          }
+        } catch (err) {
+          console.error('Error fetching smart collection:', err);
+        }
       }
+      break;
     }
-    break;
-  }
 
     case 'OPEN_CART':
       ctx.setScreen('cart');

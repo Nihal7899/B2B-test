@@ -724,6 +724,7 @@ export async function fetchAllSmartCollections(): Promise<SmartCollection[]> {
   return data as SmartCollection[];
 }
 
+// services/catalog.ts – add this function if not present
 export async function fetchSmartCollectionById(id: string): Promise<SmartCollection | null> {
   const { data, error } = await supabase
     .from('smart_collections')
