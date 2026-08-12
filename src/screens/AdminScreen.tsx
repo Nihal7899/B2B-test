@@ -54,7 +54,9 @@ export function AdminScreen({ onBack }: AdminScreenProps) {
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${tab === id ? 'bg-brand-600 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'}`}
+              className={`shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${
+                tab === id ? 'bg-brand-600 text-white' : 'bg-white border border-ink-200 text-ink-600 hover:bg-ink-50'
+              }`}
             >
               <Icon size={18} /> {label}
             </button>
@@ -97,7 +99,11 @@ function Dashboard() {
 }
 
 // ----- BannersManager -----
-const ACTION_TYPES: ActionType[] = ['VIEW_CATEGORY', 'VIEW_PRODUCT', 'VIEW_BRAND', 'VIEW_OFFER', 'SEARCH', 'FILTER_PRODUCTS', 'OPEN_SMART_COLLECTION', 'OPEN_CART', 'OPEN_ORDERS', 'OPEN_WISHLIST', 'OPEN_ADDRESS', 'OPEN_SCREEN', 'OPEN_EXTERNAL_URL'];
+const ACTION_TYPES: ActionType[] = [
+  'VIEW_CATEGORY', 'VIEW_PRODUCT', 'VIEW_BRAND', 'VIEW_OFFER', 'SEARCH',
+  'FILTER_PRODUCTS', 'OPEN_SMART_COLLECTION', 'OPEN_CART', 'OPEN_ORDERS',
+  'OPEN_WISHLIST', 'OPEN_ADDRESS', 'OPEN_SCREEN', 'OPEN_EXTERNAL_URL'
+];
 
 function BannersManager() {
   const [banners, setBanners] = useState<HomeBanner[]>([]);
@@ -167,7 +173,9 @@ function BannersManager() {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Plus size={16} /> Add banner</button>
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add banner
+      </button>
       {showForm && <BannerForm initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
       {banners.map((banner, i) => (
         <div key={banner.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card">
@@ -181,7 +189,9 @@ function BannersManager() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <span className={`text-[10px] font-bold rounded-full px-2.5 py-0.5 ${banner.is_active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>{banner.is_active ? 'ACTIVE' : 'HIDDEN'}</span>
+                <span className={`text-[10px] font-bold rounded-full px-2.5 py-0.5 ${banner.is_active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>
+                  {banner.is_active ? 'ACTIVE' : 'HIDDEN'}
+                </span>
                 <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">Order: {banner.display_order}</span>
                 <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">Pos: {banner.position || 'top'}</span>
                 <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">{banner.action_type}</span>
@@ -354,11 +364,36 @@ function BannerForm({ initial, onClose, onSaved }: { initial: HomeBanner | null;
       <div>
         <label className="block text-xs font-bold text-ink-600 mb-1">Position</label>
         <select value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
-          <option value="top">Top (rectangular ad)</option>
+          <option value="top">Top (rectangular ad – promo code)</option>
           <option value="middle">Middle (inside content)</option>
           <option value="bottom">Bottom</option>
         </select>
       </div>
+
+      {/* Promo code fields – only when position is 'top' */}
+      {form.position === 'top' && (
+        <>
+          <div>
+            <label className="block text-xs font-bold text-ink-600 mb-1">Promo Code</label>
+            <input
+              value={(form.action_config.promoCode as string) || ''}
+              onChange={(e) => setActionConfig('promoCode', e.target.value)}
+              placeholder="e.g. HYPER10"
+              className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-ink-600 mb-1">Discount Text</label>
+            <input
+              value={(form.action_config.discount as string) || ''}
+              onChange={(e) => setActionConfig('discount', e.target.value)}
+              placeholder="e.g. 10% OFF"
+              className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500"
+            />
+          </div>
+        </>
+      )}
+
       <div>
         <label className="block text-xs font-bold text-ink-600 mb-1">Action type</label>
         <select value={form.action_type} onChange={(e) => setForm({ ...form, action_type: e.target.value as ActionType, action_config: {} })} className="w-full h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500">
@@ -456,7 +491,9 @@ function BannerForm({ initial, onClose, onSaved }: { initial: HomeBanner | null;
           <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
         </div>
       </div>
-      <button onClick={handleSave} disabled={saving || !form.title || !form.image_url} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">{saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save banner</>}</button>
+      <button onClick={handleSave} disabled={saving || !form.title || !form.image_url} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save banner</>}
+      </button>
     </div>
   );
 }
@@ -495,7 +532,9 @@ function StoresManager() {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Plus size={16} /> Add store</button>
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add store
+      </button>
       {showForm && <StoreForm initial={editing} products={products} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
       {stores.map((store) => (
         <div key={store.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card">
@@ -509,7 +548,9 @@ function StoresManager() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <span className={`text-[10px] font-bold rounded-full px-2.5 py-0.5 ${store.is_active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>{store.is_active ? 'ACTIVE' : 'HIDDEN'}</span>
+                <span className={`text-[10px] font-bold rounded-full px-2.5 py-0.5 ${store.is_active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'}`}>
+                  {store.is_active ? 'ACTIVE' : 'HIDDEN'}
+                </span>
                 <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">Order: {store.sort_order}</span>
                 <span className="text-[10px] text-ink-400 bg-ink-50 px-2 py-0.5 rounded-full">{store.product_ids?.length ?? 0} products</span>
               </div>
@@ -592,7 +633,9 @@ function StoreForm({ initial, products, onClose, onSaved }: { initial: Store | n
           <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
         </div>
       </div>
-      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">{saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save store</>}</button>
+      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save store</>}
+      </button>
     </div>
   );
 }
@@ -626,7 +669,9 @@ function BrandsManager() {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Plus size={16} /> Add brand</button>
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add brand
+      </button>
       {showForm && <BrandForm initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
       {brands.map((brand) => (
         <div key={brand.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card">
@@ -691,12 +736,14 @@ function BrandForm({ initial, onClose, onSaved }: { initial: TrustedBrand | null
           <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
         </div>
       </div>
-      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">{saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save brand</>}</button>
+      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save brand</>}
+      </button>
     </div>
   );
 }
 
-// ----- CategoriesManager (with labels) -----
+// ----- CategoriesManager -----
 function CategoriesManager() {
   const [categories, setCategories] = useState<DbCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -720,7 +767,9 @@ function CategoriesManager() {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Plus size={16} /> Add category</button>
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add category
+      </button>
       {showForm && <CategoryForm initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
       {categories.map((cat) => (
         <div key={cat.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card flex items-center gap-3">
@@ -738,7 +787,14 @@ function CategoriesManager() {
 }
 
 function CategoryForm({ initial, onClose, onSaved }: { initial: DbCategory | null; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: initial?.name ?? '', slug: initial?.slug ?? '', image_url: initial?.image_url ?? '', description: initial?.description ?? '', sort_order: initial?.sort_order ?? 0, is_active: initial?.is_active ?? true });
+  const [form, setForm] = useState({
+    name: initial?.name ?? '',
+    slug: initial?.slug ?? '',
+    image_url: initial?.image_url ?? '',
+    description: initial?.description ?? '',
+    sort_order: initial?.sort_order ?? 0,
+    is_active: initial?.is_active ?? true,
+  });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -777,12 +833,14 @@ function CategoryForm({ initial, onClose, onSaved }: { initial: DbCategory | nul
           <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
         </div>
       </div>
-      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">{saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save</>}</button>
+      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save</>}
+      </button>
     </div>
   );
 }
 
-// ----- ProductsManager (with labels) -----
+// ----- ProductsManager -----
 function ProductsManager() {
   const [products, setProducts] = useState<DbProduct[]>([]);
   const [categories, setCategories] = useState<DbCategory[]>([]);
@@ -811,7 +869,9 @@ function ProductsManager() {
 
   return (
     <div className="space-y-3">
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Plus size={16} /> Add product</button>
+      <button onClick={() => { setEditing(null); setShowForm(true); }} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        <Plus size={16} /> Add product
+      </button>
       {showForm && <ProductForm initial={editing} categories={categories} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
       {products.map((prod) => (
         <div key={prod.id} className="bg-white border border-ink-100 rounded-2xl p-4 shadow-card flex items-center gap-3">
@@ -916,12 +976,14 @@ function ProductForm({ initial, categories, onClose, onSaved }: { initial: DbPro
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Product description" rows={2} className="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brand-500 resize-none" />
       </div>
       <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="accent-brand-600" /> Active</label>
-      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">{saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save</>}</button>
+      <button onClick={handleSave} disabled={saving} className="w-full h-11 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2">
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save</>}
+      </button>
     </div>
   );
 }
 
-// ----- RolesManager (with labels) -----
+// ----- RolesManager -----
 function RolesManager() {
   const [users, setUsers] = useState<{ user_id: string; role: string; full_name: string; phone: string }[]>([]);
   const [loading, setLoading] = useState(true);

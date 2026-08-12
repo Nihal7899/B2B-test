@@ -92,8 +92,8 @@ export function HomeScreen({
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
 
-      {/* Top Ad Banner - rounded rectangle with image background */}
-      {!query && topBanner && <PromoAdBanner banner={topBanner} onAction={onBannerAction} />}
+      {/* Top Ad Banner – promo code display */}
+      {!query && topBanner && <PromoAdBanner banner={topBanner} />}
 
       {/* Promo Carousel */}
       {!query && banners.length > 0 && <PromoCarousel banners={banners.slice(0, 3)} onAction={onBannerAction} />}
@@ -138,7 +138,7 @@ export function HomeScreen({
             <CategoryCarousel categories={categories.slice(0, 10)} onCategoryClick={onCategory} />
           </section>
 
-          {/* Stores */}
+          {/* Stores – only if we have data */}
           {stores.length > 0 && (
             <div>
               <SectionHeader title="Shop by Stores" subtitle="Curated collections" accent="bg-purple-600" />
@@ -146,7 +146,7 @@ export function HomeScreen({
             </div>
           )}
 
-          {/* Trusted Brands */}
+          {/* Trusted Brands – only if we have data */}
           {brands.length > 0 && (
             <div>
               <SectionHeader title="Trusted Brands" subtitle="Quality you can rely on" accent="bg-blue-600" />
@@ -157,7 +157,7 @@ export function HomeScreen({
           {/* Popular Products */}
           {popular.length > 0 && <ProductCarousel title="Popular Products" products={popular} {...actions} />}
 
-          {/* Middle Ad Banner - dynamic from DB */}
+          {/* Middle Ad Banner – dynamic from DB */}
           {middleBanner && (
             <section className="px-4">
               <div className="relative overflow-hidden rounded-2xl min-h-[116px] flex items-center" style={{ background: middleBanner.background_color || 'bg-accent-50' }}>
@@ -189,7 +189,7 @@ export function HomeScreen({
               <div className="rounded-2xl bg-brand-50 border border-brand-100 p-3.5 min-h-[118px]"><Truck className="text-brand-600" size={21} /><h3 className="font-bold text-sm text-brand-900 mt-3">Fast delivery</h3><p className="text-[10px] text-brand-700 mt-1">Same day in Bengaluru</p></div>
               <div className="rounded-2xl bg-ink-50 border border-ink-200 p-3.5 min-h-[118px]"><ShieldCheck className="text-ink-600" size={21} /><h3 className="font-bold text-sm text-ink-800 mt-3">Quality assured</h3><p className="text-[10px] text-ink-600 mt-1">Verified brands only</p></div>
               <div className="rounded-2xl bg-orange-50 border border-orange-100 p-3.5 min-h-[118px]"><Tag className="text-orange-600" size={21} /><h3 className="font-bold text-sm text-orange-900 mt-3">Best prices</h3><p className="text-[10px] text-orange-700 mt-1">Wholesale rates daily</p></div>
-              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3.5 min-h-[118px]"><RotateCcw className="text-sky-600" size={21} /><h3 className="font-bold text-sm text-sky-900 mt-3">Easy returns</h3><p className="text-[10px] text-sky-700 mt-1">Simple, hassle-free</p></div>
+              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3.5 min-h-[118px]"><RotateCcw className="text-sky-600" size={21} /><h3 className="text-sm font-bold text-sky-900 mt-3">Easy returns</h3><p className="text-[10px] text-sky-700 mt-1">Simple, hassle-free</p></div>
             </div>
           </section>
 
