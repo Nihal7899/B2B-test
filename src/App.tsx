@@ -60,8 +60,8 @@ function App() {
     setFilterTitle,
   };
 
-  const handleBannerAction = (banner: PromoBanner) => {
-    handleHomeAction(banner.actionType, banner.actionConfig, actionCtx);
+  const handleBannerAction = async (banner: PromoBanner) => {
+    await handleHomeAction(banner.actionType, banner.actionConfig, actionCtx);
   };
 
   const handleBusinessRegistered = (_business: Business) => {

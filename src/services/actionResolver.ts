@@ -10,11 +10,11 @@ export interface ActionContext {
   setFilterTitle: (title: string) => void;
 }
 
-export function handleHomeAction(
+export async function handleHomeAction(
   actionType?: string,
   actionConfig?: Record<string, unknown>,
   ctx?: ActionContext
-): void {
+): Promise<void> {
   if (!actionType || !ctx) return;
 
   const config = actionConfig || {};
@@ -115,18 +115,22 @@ export function handleHomeAction(
       break;
     }
 
-    case 'OPEN_SMART_COLLECTION': {
-      const collectionId = config.collection_id as string;
-      const collectionName = config.name as string || 'Collection';
-      if (collectionId) {
-        // In a full implementation, fetch the collection's filter_config.
-        // For now, navigate to filteredProducts with an empty filter.
-        ctx.setFilterConfig({});
-        ctx.setFilterTitle(collectionName);
+  case 'OPEN_SMART_COLLECTION': {
+    const collectionId = config.collection_id as string;
+    const collectionName = config.name as string || 'Collection';
+    if (collectionId) {
+      // Fetch the collection's filter config and apply it
+      const collection = await fetchSmartCollectionById(collectionId);
+      if (collection) {
+        ctx.setFilterConfig(collection.filter_config);
+        ctx.setFilterTitle(collection.name);
         ctx.setScreen('filteredProducts');
+      } else {
+        console.warn('Smart collection not found:', collectionId);
       }
-      break;
     }
+    break;
+  }
 
     case 'OPEN_CART':
       ctx.setScreen('cart');

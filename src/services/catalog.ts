@@ -703,3 +703,70 @@ export async function deleteTrustedBrand(id: string): Promise<void> {
 }
 
 export type { ActionType };
+
+// ----- SMART COLLECTIONS CRUD -----
+export async function fetchSmartCollections(): Promise<SmartCollection[]> {
+  const { data, error } = await supabase
+    .from('smart_collections')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as SmartCollection[];
+}
+
+export async function fetchAllSmartCollections(): Promise<SmartCollection[]> {
+  const { data, error } = await supabase
+    .from('smart_collections')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as SmartCollection[];
+}
+
+export async function fetchSmartCollectionById(id: string): Promise<SmartCollection | null> {
+  const { data, error } = await supabase
+    .from('smart_collections')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as SmartCollection | null;
+}
+
+export async function createSmartCollection(
+  input: Omit<SmartCollection, 'id' | 'created_at' | 'updated_at'>
+): Promise<SmartCollection | null> {
+  const { data, error } = await supabase
+    .from('smart_collections')
+    .insert({
+      name: input.name,
+      description: input.description,
+      filter_config: input.filter_config,
+      is_active: input.is_active,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as SmartCollection;
+}
+
+export async function updateSmartCollection(
+  id: string,
+  updates: Partial<SmartCollection>
+): Promise<void> {
+  const { error } = await supabase
+    .from('smart_collections')
+    .update({
+      name: updates.name,
+      description: updates.description,
+      filter_config: updates.filter_config,
+      is_active: updates.is_active,
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteSmartCollection(id: string): Promise<void> {
+  await supabase.from('smart_collections').delete().eq('id', id);
+}
