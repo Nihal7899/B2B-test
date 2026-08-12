@@ -32,6 +32,7 @@ export interface PromoBanner {
   badge?: string;
   actionType?: string;
   actionConfig?: Record<string, unknown>;
+  position?: string;   // ✅ ADD THIS
 }
 
 export interface CartItem {
