@@ -7,7 +7,7 @@ interface PromoAdBannerProps {
 
 export function PromoAdBanner({ banner }: PromoAdBannerProps) {
   const promoCode = (banner.actionConfig?.promoCode as string) || 'HYPER10';
-  const discount = (banner.actionConfig?.discount as string) || '10%';
+  const discount = (banner.actionConfig?.discount as string) || '10% OFF';
 
   return (
     <div className="mx-4 rounded-2xl overflow-hidden relative min-h-[100px] shadow-card">
@@ -27,7 +27,7 @@ export function PromoAdBanner({ banner }: PromoAdBannerProps) {
           <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-lg text-sm font-mono font-bold tracking-wider border border-white/30">
             {promoCode}
           </span>
-          <span className="text-sm font-semibold">{discount} OFF</span>
+          <span className="text-sm font-semibold">{discount}</span>
         </div>
         <p className="text-xs opacity-80 mt-1">{banner.subtext}</p>
       </div>

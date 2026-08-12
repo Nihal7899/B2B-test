@@ -59,7 +59,7 @@ export function HomeScreen({
         setStores(storesRes);
         setBrands(brandsRes);
 
-        // Separate banners by position
+        // ✅ Strict separation by position
         const top = bannerRes.find((b) => b.position === 'top') || null;
         const middle = bannerRes.find((b) => b.position === 'middle') || null;
         setTopBanner(top);
@@ -88,6 +88,13 @@ export function HomeScreen({
 
   if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="h-8 w-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" /></div>;
 
+  // Map background color names to Tailwind classes for the middle banner
+  const bgMap: Record<string, string> = {
+    brand: 'bg-brand-50',
+    accent: 'bg-accent-50',
+    ink: 'bg-ink-50',
+  };
+
   return (
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
@@ -95,8 +102,13 @@ export function HomeScreen({
       {/* Top Ad Banner – promo code display */}
       {!query && topBanner && <PromoAdBanner banner={topBanner} />}
 
-      {/* Promo Carousel */}
-      {!query && banners.length > 0 && <PromoCarousel banners={banners.slice(0, 3)} onAction={onBannerAction} />}
+      {/* Promo Carousel – only other banners (excluding top & middle) */}
+      {!query && banners.length > 0 && (
+        <PromoCarousel
+          banners={banners.filter((b) => b.position !== 'top' && b.position !== 'middle').slice(0, 3)}
+          onAction={onBannerAction}
+        />
+      )}
 
       {query ? (
         <div className="px-4">
@@ -138,7 +150,7 @@ export function HomeScreen({
             <CategoryCarousel categories={categories.slice(0, 10)} onCategoryClick={onCategory} />
           </section>
 
-          {/* Stores – only if we have data */}
+          {/* Stores */}
           {stores.length > 0 && (
             <div>
               <SectionHeader title="Shop by Stores" subtitle="Curated collections" accent="bg-purple-600" />
@@ -146,7 +158,7 @@ export function HomeScreen({
             </div>
           )}
 
-          {/* Trusted Brands – only if we have data */}
+          {/* Trusted Brands */}
           {brands.length > 0 && (
             <div>
               <SectionHeader title="Trusted Brands" subtitle="Quality you can rely on" accent="bg-blue-600" />
@@ -157,10 +169,13 @@ export function HomeScreen({
           {/* Popular Products */}
           {popular.length > 0 && <ProductCarousel title="Popular Products" products={popular} {...actions} />}
 
-          {/* Middle Ad Banner – dynamic from DB */}
+          {/* Middle Ad Banner – with proper background color */}
           {middleBanner && (
             <section className="px-4">
-              <div className="relative overflow-hidden rounded-2xl min-h-[116px] flex items-center" style={{ background: middleBanner.background_color || 'bg-accent-50' }}>
+              <div
+                className={`relative overflow-hidden rounded-2xl min-h-[116px] flex items-center border border-${middleBanner.background_color || 'accent'}-100`}
+              >
+                <div className={`absolute inset-0 ${bgMap[middleBanner.background_color] || 'bg-accent-50'}`} />
                 <div className="p-4 relative z-10 w-[65%]">
                   {middleBanner.badge && (
                     <span className="text-[9px] font-bold text-accent-700 tracking-wider uppercase">{middleBanner.badge}</span>
@@ -169,13 +184,17 @@ export function HomeScreen({
                   <p className="text-[11px] text-ink-600 mt-1">{middleBanner.subtext}</p>
                   <button
                     onClick={() => onBannerAction?.(middleBanner)}
-                    className="mt-2.5 bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5"
+                    className="mt-2.5 bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5 shadow-sm"
                   >
                     {middleBanner.cta}
                   </button>
                 </div>
-                <img src={middleBanner.image} alt={middleBanner.headline} className="absolute right-0 top-0 h-full w-[44%] object-cover" />
-                <div className="absolute right-[35%] top-0 h-full w-20 bg-gradient-to-r from-accent-50 to-transparent" />
+                <img
+                  src={middleBanner.image}
+                  alt={middleBanner.headline}
+                  className="absolute right-0 top-0 h-full w-[44%] object-cover"
+                />
+                <div className={`absolute right-[35%] top-0 h-full w-20 bg-gradient-to-r from-${middleBanner.background_color || 'accent'}-50 to-transparent`} />
               </div>
             </section>
           )}
@@ -189,7 +208,7 @@ export function HomeScreen({
               <div className="rounded-2xl bg-brand-50 border border-brand-100 p-3.5 min-h-[118px]"><Truck className="text-brand-600" size={21} /><h3 className="font-bold text-sm text-brand-900 mt-3">Fast delivery</h3><p className="text-[10px] text-brand-700 mt-1">Same day in Bengaluru</p></div>
               <div className="rounded-2xl bg-ink-50 border border-ink-200 p-3.5 min-h-[118px]"><ShieldCheck className="text-ink-600" size={21} /><h3 className="font-bold text-sm text-ink-800 mt-3">Quality assured</h3><p className="text-[10px] text-ink-600 mt-1">Verified brands only</p></div>
               <div className="rounded-2xl bg-orange-50 border border-orange-100 p-3.5 min-h-[118px]"><Tag className="text-orange-600" size={21} /><h3 className="font-bold text-sm text-orange-900 mt-3">Best prices</h3><p className="text-[10px] text-orange-700 mt-1">Wholesale rates daily</p></div>
-              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3.5 min-h-[118px]"><RotateCcw className="text-sky-600" size={21} /><h3 className="text-sm font-bold text-sky-900 mt-3">Easy returns</h3><p className="text-[10px] text-sky-700 mt-1">Simple, hassle-free</p></div>
+              <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3.5 min-h-[118px]"><RotateCcw className="text-sky-600" size={21} /><h3 className="font-bold text-sm text-sky-900 mt-3">Easy returns</h3><p className="text-[10px] text-sky-700 mt-1">Simple, hassle-free</p></div>
             </div>
           </section>
 
