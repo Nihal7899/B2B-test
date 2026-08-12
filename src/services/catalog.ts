@@ -39,22 +39,6 @@ export interface DbProduct {
   is_active: boolean;
 }
 
-export interface DbPromotion {
-  id: string;
-  headline: string;
-  subtext: string;
-  cta_label: string;
-  image_url: string;
-  background: string;
-  badge: string;
-  sort_order: number;
-  is_active: boolean;
-  start_at: string | null;
-  end_at: string | null;
-  action_type: string;
-  action_config: Record<string, unknown>;
-}
-
 export interface DbOrder {
   id: string;
   order_number: string;
@@ -115,11 +99,14 @@ const categoryColors = [
   'bg-purple-50',
 ];
 
+const PLACEHOLDER_CATEGORY = 'https://placehold.co/600x400/EEE/999?text=Category';
+const PLACEHOLDER_PRODUCT = 'https://placehold.co/400x400/EEE/999?text=Product';
+
 export function mapCategory(db: DbCategory, index: number, productCount?: number): Category {
   return {
-    id: db.id,
+    id: db.slug, // use slug as ID for routing
     name: db.name,
-    image: db.image_url,
+    image: db.image_url?.trim() ? db.image_url : PLACEHOLDER_CATEGORY,
     count: productCount ?? 0,
     color: categoryColors[index % categoryColors.length],
   };
@@ -133,7 +120,7 @@ export function mapProduct(db: DbProduct, categoryId: string): Product {
     packSize: db.pack_size,
     mrp: Number(db.mrp),
     price: Number(db.wholesale_price),
-    image: db.image_url,
+    image: db.image_url?.trim() ? db.image_url : PLACEHOLDER_PRODUCT,
     category: categoryId,
     moq: db.moq,
     rating: Number(db.rating),
@@ -147,21 +134,6 @@ const bgMap: Record<string, string> = {
   accent: 'bg-gradient-to-br from-accent-500 to-accent-700',
   ink: 'bg-gradient-to-br from-ink-800 to-ink-900',
 };
-
-export function mapPromotion(db: DbPromotion): PromoBanner {
-  return {
-    id: db.id,
-    headline: db.headline,
-    subtext: db.subtext,
-    cta: db.cta_label,
-    image: db.image_url,
-    bgClass: bgMap[db.background] ?? bgMap.brand,
-    textClass: 'text-white',
-    badge: db.badge,
-    actionType: db.action_type,
-    actionConfig: db.action_config,
-  };
-}
 
 export function mapOrder(db: DbOrder, items: DbOrderItem[]): Order {
   const statusMap: Record<string, Order['status']> = {
@@ -188,6 +160,7 @@ export function mapOrder(db: DbOrder, items: DbOrderItem[]): Order {
   };
 }
 
+// ----- FETCH CATEGORIES -----
 export async function fetchCategories(): Promise<{ categories: Category[]; slugMap: Record<string, string> }> {
   const { data, error } = await supabase
     .from('categories')
@@ -203,6 +176,7 @@ export async function fetchCategories(): Promise<{ categories: Category[]; slugM
   return { categories, slugMap };
 }
 
+// ----- FETCH PRODUCTS -----
 export async function fetchProducts(): Promise<{ products: Product[]; categoryMap: Record<string, string> }> {
   const { data: catData } = await supabase
     .from('categories')
@@ -225,19 +199,7 @@ export async function fetchProducts(): Promise<{ products: Product[]; categoryMa
   return { products, categoryMap };
 }
 
-export async function fetchPromotions(): Promise<PromoBanner[]> {
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('promotions')
-    .select('*')
-    .eq('is_active', true)
-    .or(`start_at.is.null,start_at.lte.${now}`)
-    .or(`end_at.is.null,end_at.gte.${now}`)
-    .order('sort_order');
-  if (error) throw error;
-  return (data as DbPromotion[]).map(mapPromotion);
-}
-
+// ----- FETCH PRODUCT BY ID -----
 export async function fetchProductById(id: string): Promise<{ product: Product; related: Product[] } | null> {
   const { data, error } = await supabase
     .from('products')
@@ -270,6 +232,7 @@ export async function fetchProductById(id: string): Promise<{ product: Product; 
   return { product, related };
 }
 
+// ----- WISHLIST -----
 export async function fetchWishlist(): Promise<string[]> {
   const { data, error } = await supabase.from('wishlists').select('product_id');
   if (error) return [];
@@ -284,6 +247,7 @@ export async function toggleWishlist(productId: string, isWishlisted: boolean): 
   }
 }
 
+// ----- ADDRESSES -----
 export async function fetchAddresses(): Promise<DbAddress[]> {
   const { data, error } = await supabase
     .from('addresses')
@@ -298,6 +262,7 @@ export async function deleteAddress(id: string): Promise<void> {
   await supabase.from('addresses').delete().eq('id', id);
 }
 
+// ----- ORDERS -----
 export async function fetchOrders(): Promise<Order[]> {
   const { data: orderData, error: orderError } = await supabase
     .from('orders')
@@ -364,6 +329,7 @@ export async function clearCartItems(cartId: string): Promise<void> {
   await supabase.from('cart_items').delete().eq('cart_id', cartId);
 }
 
+// ----- PROFILE -----
 export async function fetchProfile() {
   const { data, error } = await supabase.from('profiles').select('*').maybeSingle();
   if (error) return null;
@@ -384,6 +350,7 @@ export async function updateProfile(updates: {
   if (error) throw error;
 }
 
+// ----- HOME BANNERS (Unified) -----
 export interface DbHomeBanner {
   id: string;
   badge: string | null;
@@ -396,14 +363,13 @@ export interface DbHomeBanner {
   action_config: Record<string, unknown>;
   display_order: number;
   is_active: boolean;
-  position: string; // 'top' | 'middle' | 'bottom'
+  position: string; // 'top' | 'carousel' | 'middle' | 'bottom'
   start_at: string | null;
   end_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// ✅ IMPORTANT: mapHomeBanner MUST include position
 export function mapHomeBanner(db: DbHomeBanner): PromoBanner {
   return {
     id: db.id,
@@ -416,7 +382,7 @@ export function mapHomeBanner(db: DbHomeBanner): PromoBanner {
     badge: db.badge ?? undefined,
     actionType: db.action_type,
     actionConfig: db.action_config,
-    position: db.position || 'top', // ✅ position is set here
+    position: db.position || 'top',
   };
 }
 
@@ -525,6 +491,7 @@ export async function duplicateHomeBanner(id: string): Promise<HomeBanner | null
   return data as HomeBanner;
 }
 
+// ----- FILTERED PRODUCTS -----
 export async function fetchFilteredProducts(filter: FilterConfig): Promise<Product[]> {
   const { data: catData } = await supabase
     .from('categories')
@@ -615,7 +582,7 @@ export async function fetchAllBrands(): Promise<string[]> {
   return Array.from(brands).sort();
 }
 
-// ----- STORES (CRUD) -----
+// ----- STORES CRUD -----
 export async function fetchStores(): Promise<Store[]> {
   const { data, error } = await supabase
     .from('stores')
@@ -681,7 +648,7 @@ export async function deleteStore(id: string): Promise<void> {
   await supabase.from('stores').delete().eq('id', id);
 }
 
-// ----- TRUSTED BRANDS (CRUD) -----
+// ----- TRUSTED BRANDS CRUD -----
 export async function fetchTrustedBrands(): Promise<TrustedBrand[]> {
   const { data, error } = await supabase
     .from('trusted_brands')

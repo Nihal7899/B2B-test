@@ -1,3 +1,4 @@
+// types.ts
 export interface Product {
   id: string;
   brand: string;
@@ -32,7 +33,7 @@ export interface PromoBanner {
   badge?: string;
   actionType?: string;
   actionConfig?: Record<string, unknown>;
-  position?: string;   // ✅ ADD THIS
+  position?: string; // 'top' | 'carousel' | 'middle' | 'bottom'
 }
 
 export interface CartItem {
@@ -50,7 +51,24 @@ export interface Order {
   items: string[];
 }
 
-export type ScreenName = 'home' | 'categories' | 'orders' | 'cart' | 'account' | 'product' | 'admin' | 'warehouse' | 'delivery' | 'addresses' | 'wishlist' | 'checkout' | 'orderDetail' | 'businessRegistration' | 'businessSelect' | 'outletSelect' | 'filteredProducts';
+export type ScreenName =
+  | 'home'
+  | 'categories'
+  | 'orders'
+  | 'cart'
+  | 'account'
+  | 'product'
+  | 'admin'
+  | 'warehouse'
+  | 'delivery'
+  | 'addresses'
+  | 'wishlist'
+  | 'checkout'
+  | 'orderDetail'
+  | 'businessRegistration'
+  | 'businessSelect'
+  | 'outletSelect'
+  | 'filteredProducts';
 
 export interface Business {
   id: string;
@@ -146,6 +164,7 @@ export interface HomeBanner {
   action_config: Record<string, unknown>;
   display_order: number;
   is_active: boolean;
+  position: string; // 'top' | 'carousel' | 'middle' | 'bottom'
   start_at: string | null;
   end_at: string | null;
   created_at: string;

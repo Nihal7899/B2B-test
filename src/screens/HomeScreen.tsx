@@ -15,7 +15,6 @@ import {
   fetchCategories,
   fetchProducts,
   fetchHomeBanners,
-  fetchPromotions,
   fetchStores,
   fetchTrustedBrands,
 } from '@/services/catalog';
@@ -43,36 +42,36 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [carouselBanners, setCarouselBanners] = useState<PromoBanner[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [brands, setBrands] = useState<TrustedBrand[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [topBanner, setTopBanner] = useState<PromoBanner | null>(null);
+  const [carouselBanners, setCarouselBanners] = useState<PromoBanner[]>([]);
   const [middleBanner, setMiddleBanner] = useState<PromoBanner | null>(null);
   const [bottomBanner, setBottomBanner] = useState<PromoBanner | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [catRes, prodRes, homeBanners, promoBanners, storesRes, brandsRes] = await Promise.all([
+        const [catRes, prodRes, banners, storesRes, brandsRes] = await Promise.all([
           fetchCategories(),
           fetchProducts(),
           fetchHomeBanners(),
-          fetchPromotions(),
           fetchStores(),
           fetchTrustedBrands(),
         ]);
         setCategories(catRes.categories);
         setProducts(prodRes.products);
-        setCarouselBanners(promoBanners);
         setStores(storesRes);
         setBrands(brandsRes);
 
-        // Get banners by position
-        const top = homeBanners.find((b) => b.position === 'top') || null;
-        const middle = homeBanners.find((b) => b.position === 'middle') || null;
-        const bottom = homeBanners.find((b) => b.position === 'bottom') || null;
+        const top = banners.find((b) => b.position === 'top') || null;
+        const carousel = banners.filter((b) => b.position === 'carousel');
+        const middle = banners.find((b) => b.position === 'middle') || null;
+        const bottom = banners.find((b) => b.position === 'bottom') || null;
         setTopBanner(top);
+        setCarouselBanners(carousel);
         setMiddleBanner(middle);
         setBottomBanner(bottom);
       } catch (err) {
@@ -102,19 +101,16 @@ export function HomeScreen({
     onViewAll,
   };
 
-  // Map background color names to Tailwind classes
   const bgMap: Record<string, string> = {
     brand: 'bg-brand-50',
     accent: 'bg-accent-50',
     ink: 'bg-ink-50',
   };
-
   const borderMap: Record<string, string> = {
     brand: 'border-brand-100',
     accent: 'border-accent-100',
     ink: 'border-ink-100',
   };
-
   const accentTextMap: Record<string, string> = {
     brand: 'text-brand-700',
     accent: 'text-accent-700',
@@ -132,16 +128,15 @@ export function HomeScreen({
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
 
-      {/* TOP AD BANNER – rectangular promo code banner (no action button) */}
+      {/* 1. TOP RECTANGULAR PROMO CODE BANNER */}
       {!query && topBanner && <PromoAdBanner banner={topBanner} />}
 
-      {/* PROMO CAROUSEL – action button banners from promotions table */}
+      {/* 2. CAROUSEL OF ACTION BANNERS */}
       {!query && carouselBanners.length > 0 && (
         <PromoCarousel banners={carouselBanners} onAction={onBannerAction} />
       )}
 
       {query ? (
-        // Search results
         <div className="px-4">
           <p className="text-xs text-ink-500 mb-3">
             {filtered.length} products found for{' '}
@@ -162,6 +157,9 @@ export function HomeScreen({
                     alt={p.name}
                     className="h-full w-full object-cover"
                     loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://placehold.co/400x400/EEE/999?text=Product';
+                    }}
                   />
                 </div>
                 <div className="p-2.5">
@@ -210,7 +208,6 @@ export function HomeScreen({
           </div>
         </div>
       ) : (
-        // Home content (no search)
         <>
           {/* Categories */}
           <section>
@@ -252,7 +249,7 @@ export function HomeScreen({
             <ProductCarousel title="Popular Products" products={popular} {...actions} />
           )}
 
-          {/* MIDDLE ACTION BUTTON BANNER – from home_banners with position 'middle' */}
+          {/* 3. MIDDLE ACTION BANNER */}
           {middleBanner && (
             <section className="px-4">
               <div
@@ -277,7 +274,7 @@ export function HomeScreen({
                   <p className="text-[11px] text-ink-600 mt-1">{middleBanner.subtext}</p>
                   <button
                     onClick={() => onBannerAction?.(middleBanner)}
-                    className="mt-2.5 bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5 shadow-sm"
+                    className="mt-2.5 bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5 shadow-sm cursor-pointer"
                   >
                     {middleBanner.cta}
                   </button>
@@ -286,6 +283,9 @@ export function HomeScreen({
                   src={middleBanner.image}
                   alt={middleBanner.headline}
                   className="absolute right-0 top-0 h-full w-[44%] object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://placehold.co/600x400/EEE/999?text=Banner';
+                  }}
                 />
                 <div
                   className={`absolute right-[35%] top-0 h-full w-20 bg-gradient-to-r from-${
@@ -332,16 +332,23 @@ export function HomeScreen({
             <ProductCarousel title="Everyday Essentials" products={essentials} {...actions} />
           )}
 
-          {/* BOTTOM ACTION BUTTON BANNER – from home_banners with position 'bottom' */}
+          {/* 4. BOTTOM ACTION BANNER */}
           {bottomBanner && (
             <section className="mx-4 rounded-2xl p-5 text-white flex items-center justify-between overflow-hidden relative">
               <div className="absolute inset-0">
-                <div className={`absolute inset-0 ${bgMap[bottomBanner.background_color] || 'bg-brand-950'}`} />
+                <div
+                  className={`absolute inset-0 ${
+                    bgMap[bottomBanner.background_color] || 'bg-brand-950'
+                  }`}
+                />
                 {bottomBanner.image && (
                   <img
                     src={bottomBanner.image}
                     alt={bottomBanner.headline}
                     className="absolute right-0 top-0 h-full w-[44%] object-cover opacity-30"
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://placehold.co/600x400/EEE/999?text=Banner';
+                    }}
                   />
                 )}
                 <div className="absolute -right-8 -bottom-10 h-36 w-36 rounded-full bg-white/10" />
@@ -355,7 +362,7 @@ export function HomeScreen({
                 <p className="text-[11px] text-white/70 mt-1.5">{bottomBanner.subtext}</p>
                 <button
                   onClick={() => onBannerAction?.(bottomBanner)}
-                  className="mt-3 flex items-center gap-1 text-xs font-bold bg-white text-brand-900 px-3 py-1.5 rounded-lg"
+                  className="mt-3 flex items-center gap-1 text-xs font-bold bg-white text-brand-900 px-3 py-1.5 rounded-lg cursor-pointer"
                 >
                   {bottomBanner.cta || 'Learn more'} <ArrowRight size={13} />
                 </button>
