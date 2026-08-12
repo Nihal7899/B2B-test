@@ -18,38 +18,30 @@ export function handleHomeAction(
   if (!actionType || !ctx) return;
 
   const config = actionConfig || {};
+  console.log('[Action]', actionType, config);
 
   switch (actionType) {
     case 'VIEW_CATEGORY': {
       const categoryId = config.category_id as string;
       const categoryName = config.category_name as string || 'Category';
       if (categoryId) {
-        // Navigate to filtered products with that category
         ctx.setFilterConfig({ category_ids: [categoryId] });
         ctx.setFilterTitle(categoryName);
         ctx.setScreen('filteredProducts');
+      } else {
+        console.warn('VIEW_CATEGORY: missing category_id');
       }
       break;
     }
 
     case 'VIEW_PRODUCT': {
       const productId = config.product_id as string;
-      // We need to fetch the product by ID – but we don't have the product object here.
-      // Alternatively, we can navigate to product detail if we have the product ID.
-      // For simplicity, we can use the product_name to search.
+      const productName = config.product_name as string || '';
       if (productId) {
-        // You can either set search to the product name or navigate directly.
-        // Since we have openProduct, we need the full product object – not available here.
-        // Better: use search to find the product.
-        const productName = config.product_name as string || '';
-        if (productName) {
-          ctx.setSearch(productName);
-          ctx.setScreen('home');
-        } else {
-          // fallback: search by ID (not recommended)
-          ctx.setSearch(productId);
-          ctx.setScreen('home');
-        }
+        // Use search as a fallback; ideally we would fetch the product and call openProduct.
+        // For simplicity, search by product name or ID.
+        ctx.setSearch(productName || productId);
+        ctx.setScreen('home');
       }
       break;
     }
@@ -64,13 +56,7 @@ export function handleHomeAction(
       break;
     }
 
-    case 'VIEW_OFFER': {
-      const query = config.query as string || '';
-      ctx.setSearch(query);
-      ctx.setScreen('home');
-      break;
-    }
-
+    case 'VIEW_OFFER':
     case 'SEARCH': {
       const query = config.query as string || '';
       ctx.setSearch(query);
@@ -79,16 +65,16 @@ export function handleHomeAction(
     }
 
     case 'FILTER_PRODUCTS': {
-      // Build filter config from actionConfig
       const filter: FilterConfig = {};
 
-      if (config.category_ids && Array.isArray(config.category_ids)) {
+      // category_ids – expect slugs or UUIDs; we'll pass them as-is
+      if (config.category_ids && Array.isArray(config.category_ids) && config.category_ids.length > 0) {
         filter.category_ids = config.category_ids as string[];
       }
-      if (config.brand_ids && Array.isArray(config.brand_ids)) {
+      if (config.brand_ids && Array.isArray(config.brand_ids) && config.brand_ids.length > 0) {
         filter.brand_ids = config.brand_ids as string[];
       }
-      if (config.product_ids && Array.isArray(config.product_ids)) {
+      if (config.product_ids && Array.isArray(config.product_ids) && config.product_ids.length > 0) {
         filter.product_ids = config.product_ids as string[];
       }
       if (config.discount_min !== undefined && config.discount_min !== null) {
@@ -110,8 +96,18 @@ export function handleHomeAction(
         filter.sort = config.sort as FilterConfig['sort'];
       }
 
-      const title = config.title as string || 'Products';
-      ctx.setFilterConfig(filter);
+      // If no meaningful filter is set, fall back to viewing all products or show warning.
+      const hasFilter = Object.keys(filter).length > 0;
+      if (!hasFilter) {
+        console.warn('FILTER_PRODUCTS: no filter criteria provided. Showing all products.');
+        // Optionally, set filter to empty to show all products, or do nothing.
+        // We'll set an empty filter to show all products.
+        ctx.setFilterConfig({});
+      } else {
+        ctx.setFilterConfig(filter);
+      }
+
+      const title = (config.title as string) || (filter.category_ids?.length ? 'Categories' : 'Products');
       ctx.setFilterTitle(title);
       ctx.setScreen('filteredProducts');
       break;
@@ -120,11 +116,10 @@ export function handleHomeAction(
     case 'OPEN_SMART_COLLECTION': {
       const collectionId = config.collection_id as string;
       const collectionName = config.name as string || 'Collection';
-      // For simplicity, we can apply the filter from the collection's filter_config.
-      // This would require fetching the collection from DB – we can skip for now.
-      // Instead, navigate to filteredProducts with some placeholder.
       if (collectionId) {
-        ctx.setFilterConfig({}); // you'd fetch the actual filter config
+        // In a full implementation, you'd fetch the collection's filter_config.
+        // For now, navigate to filteredProducts with an empty filter.
+        ctx.setFilterConfig({});
         ctx.setFilterTitle(collectionName);
         ctx.setScreen('filteredProducts');
       }

@@ -675,7 +675,7 @@ function BannerForm({
                 size={4}
               >
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.slug}>   {/* ✅ uses slug */}
                     {c.name}
                   </option>
                 ))}
