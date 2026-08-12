@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, MapPin, Tag, Truck, Loader as Loader2, CircleCheck as CheckCircle2, CreditCard, Banknote } from 'lucide-react';
+import { ArrowLeft, MapPin, Tag, Truck, Loader as Loader2, CircleCheck as CheckCircle2, CreditCard, Banknote, AlertCircle, X } from 'lucide-react';
 import type { useCart } from '@/store';
 import type { DbAddress } from '@/services/catalog';
 import { fetchAddresses, placeOrder, clearCartItems } from '@/services/catalog';
@@ -14,6 +14,8 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'razorpay'>('cod');
+  const [showPaymentAlert, setShowPaymentAlert] = useState(false);
+  const [paymentAlertMsg, setPaymentAlertMsg] = useState('');
 
   const load = useCallback(async () => {
     const data = await fetchAddresses();
@@ -38,37 +40,70 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
       const items = cart.items.map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
       const orderId = await placeOrder(selectedAddr, items);
       if (!orderId) throw new Error('Order failed');
+
       if (paymentMethod === 'razorpay') {
         const { data: payData, error: payErr } = await supabase.functions.invoke('razorpay', {
           body: { action: 'create_order', order_id: orderId, amount: total },
         });
         if (payErr || !payData?.razorpay_order_id) {
-          setError('Payment setup failed, but your order is placed. Pay on delivery.');
-        } else if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).Razorpay) {
-          const Razorpay = (window as unknown as Record<string, unknown>).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
-          const rzp = new Razorpay({
-            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-            amount: Math.round(total * 100),
-            order_id: payData.razorpay_order_id,
-            name: 'Stackknit',
-            description: 'Wholesale order',
-            handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
-              const verification = await supabase.functions.invoke('razorpay', { body: { action: 'verify_payment', order_id: orderId, payment_id: response.razorpay_payment_id, signature: response.razorpay_signature } });
+          await supabase.functions.invoke('razorpay', { body: { action: 'cancel_order', order_id: orderId } });
+          setPaymentAlertMsg('Payment setup failed. Your order was cancelled and items remain in your cart.');
+          setShowPaymentAlert(true);
+          setPlacing(false);
+          return;
+        }
+
+        if (typeof window === 'undefined' || !(window as unknown as Record<string, unknown>).Razorpay) {
+          await supabase.functions.invoke('razorpay', { body: { action: 'cancel_order', order_id: orderId } });
+          setPaymentAlertMsg('Online payment is not available right now. Please try again or use cash on delivery.');
+          setShowPaymentAlert(true);
+          setPlacing(false);
+          return;
+        }
+
+        const Razorpay = (window as unknown as Record<string, unknown>).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
+        let paymentSucceeded = false;
+
+        const rzp = new Razorpay({
+          key: payData.key_id,
+          amount: Math.round(total * 100),
+          order_id: payData.razorpay_order_id,
+          name: 'Stackknit',
+          description: 'Wholesale order',
+          handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
+            try {
+              const verification = await supabase.functions.invoke('razorpay', {
+                body: { action: 'verify_payment', order_id: orderId, payment_id: response.razorpay_payment_id, signature: response.razorpay_signature },
+              });
               if (verification.error || !verification.data?.verified) {
-                setError('Payment could not be verified. Please contact support before trying again.');
+                setPaymentAlertMsg('Payment could not be verified. Your order is on hold — please contact support.');
+                setShowPaymentAlert(true);
+                setPlacing(false);
                 return;
               }
+              paymentSucceeded = true;
               await clearCartItems(cart.cartId ?? '');
               cart.clearCart();
               onOrderPlaced(orderId);
+            } catch {
+              setPaymentAlertMsg('Payment verification failed. Please contact support before trying again.');
+              setShowPaymentAlert(true);
+              setPlacing(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              if (!paymentSucceeded) {
+                void supabase.functions.invoke('razorpay', { body: { action: 'cancel_order', order_id: orderId } });
+                setPaymentAlertMsg('Payment was cancelled. Your order was not placed and items remain in your cart.');
+                setShowPaymentAlert(true);
+                setPlacing(false);
+              }
             },
-          });
-          rzp.open();
-        } else {
-          await clearCartItems(cart.cartId ?? '');
-          cart.clearCart();
-          onOrderPlaced(orderId);
-        }
+          },
+          theme: { color: '#16a34a' },
+        });
+        rzp.open();
       } else {
         await clearCartItems(cart.cartId ?? '');
         cart.clearCart();
@@ -154,6 +189,22 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
       <button onClick={handlePlaceOrder} disabled={placing || !selectedAddr || cart.items.length === 0} className="w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-soft disabled:opacity-60">
         {placing ? <><Loader2 size={17} className="animate-spin" /> Placing order...</> : <>Place order · ₹{total.toLocaleString('en-IN')}</>}
       </button>
+
+      {showPaymentAlert && (
+        <div className="fixed inset-0 z-[300] bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setShowPaymentAlert(false)}>
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 shrink-0"><AlertCircle size={22} /></div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-ink-900">Payment not completed</h3>
+                <p className="text-xs text-ink-500 mt-1.5 leading-relaxed">{paymentAlertMsg}</p>
+              </div>
+              <button onClick={() => setShowPaymentAlert(false)} className="text-ink-400 shrink-0"><X size={18} /></button>
+            </div>
+            <button onClick={() => setShowPaymentAlert(false)} className="w-full h-10 rounded-xl bg-ink-900 text-white text-sm font-bold">Got it</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

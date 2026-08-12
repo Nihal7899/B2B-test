@@ -7,7 +7,7 @@ import { PromoCarousel } from '@/components/PromoBanner';
 import { CategoryCarousel } from '@/components/CategoryCard';
 import { ProductCarousel } from '@/components/ProductCard';
 import { SectionHeader } from '@/components/SectionHeader';
-import { fetchCategories, fetchProducts, fetchPromotions } from '@/services/catalog';
+import { fetchCategories, fetchProducts, fetchHomeBanners } from '@/services/catalog';
 
 interface HomeScreenProps { search: string; onSearchChange: (value: string) => void; onCategory: (category: Category) => void; onProduct: (product: Product) => void; onViewAll: () => void; cart: ReturnType<typeof useCart>; onBannerAction?: (banner: PromoBanner) => void; }
 
@@ -20,10 +20,10 @@ export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onVi
   useEffect(() => {
     void (async () => {
       try {
-        const [catRes, prodRes, promoRes] = await Promise.all([fetchCategories(), fetchProducts(), fetchPromotions()]);
+        const [catRes, prodRes, bannerRes] = await Promise.all([fetchCategories(), fetchProducts(), fetchHomeBanners()]);
         setCategories(catRes.categories);
         setProducts(prodRes.products);
-        setPromotions(promoRes);
+        setPromotions(bannerRes);
       } catch (err) { console.error('Failed to load catalog', err); }
       setLoading(false);
     })();
