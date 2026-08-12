@@ -1,6 +1,7 @@
+// screens/FilteredProductsScreen.tsx
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Package } from 'lucide-react';
-import type { Product, FilterConfig } from '@/types';
+import { ArrowLeft } from 'lucide-react';
+import type { FilterConfig, Product } from '@/types';
 import type { useCart } from '@/store';
 import { fetchFilteredProducts } from '@/services/catalog';
 import { ProductCard } from '@/components/ProductCard';
@@ -13,7 +14,13 @@ interface FilteredProductsScreenProps {
   onProduct: (product: Product) => void;
 }
 
-export function FilteredProductsScreen({ filter, title, cart, onBack, onProduct }: FilteredProductsScreenProps) {
+export function FilteredProductsScreen({
+  filter,
+  title,
+  cart,
+  onBack,
+  onProduct,
+}: FilteredProductsScreenProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,39 +29,50 @@ export function FilteredProductsScreen({ filter, title, cart, onBack, onProduct 
       try {
         const data = await fetchFilteredProducts(filter);
         setProducts(data);
-      } catch (err) { console.error('Failed to load filtered products', err); }
+      } catch (err) {
+        console.error('Failed to fetch filtered products', err);
+      }
       setLoading(false);
     })();
   }, [filter]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="h-8 w-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" /></div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="h-8 w-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="px-4 pb-6 space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="h-9 w-9 rounded-xl bg-white border border-ink-200 flex items-center justify-center"><ArrowLeft size={18} /></button>
+    <div className="px-4 pb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="h-9 w-9 rounded-xl bg-white border border-ink-200 flex items-center justify-center">
+          <ArrowLeft size={18} />
+        </button>
         <div>
           <h1 className="text-xl font-extrabold text-ink-900 tracking-tight">{title}</h1>
           <p className="text-xs text-ink-500 mt-0.5">{products.length} products found</p>
         </div>
       </div>
+
       {products.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <div className="h-20 w-20 rounded-3xl bg-brand-50 flex items-center justify-center text-brand-600"><Package size={36} strokeWidth={1.5} /></div>
-          <h2 className="text-lg font-extrabold text-ink-900 mt-5">No products match</h2>
-          <p className="text-sm text-ink-500 mt-1 max-w-[250px]">No products match these filter criteria. Try adjusting the filters.</p>
+        <div className="text-center py-12">
+          <p className="text-ink-500">No products found matching your criteria.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {products.map((p) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {products.map((product) => (
             <ProductCard
-              key={p.id}
-              product={p}
-              quantity={cart.getQuantity(p.id)}
-              onAdd={() => cart.addToCart(p)}
-              onIncrement={() => cart.addToCart(p)}
-              onDecrement={() => cart.updateQuantity(p.id, cart.getQuantity(p.id) - 1)}
-              onClick={() => onProduct(p)}
+              key={product.id}
+              product={product}
+              quantity={cart.getQuantity(product.id)}
+              onAdd={() => cart.addToCart(product)}
+              onIncrement={() => cart.addToCart(product)}
+              onDecrement={() =>
+                cart.updateQuantity(product.id, cart.getQuantity(product.id) - 1)
+              }
+              onClick={onProduct}
             />
           ))}
         </div>
