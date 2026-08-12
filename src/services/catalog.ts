@@ -1,6 +1,16 @@
 // services/catalog.ts
 import { supabase } from '@/lib/supabase';
-import type { Product, Category, PromoBanner, Order, FilterConfig, HomeBanner, ActionType, Store, TrustedBrand } from '@/types';
+import type {
+  Product,
+  Category,
+  PromoBanner,
+  Order,
+  FilterConfig,
+  HomeBanner,
+  ActionType,
+  Store,
+  TrustedBrand,
+} from '@/types';
 
 export interface DbCategory {
   id: string;
@@ -91,9 +101,18 @@ export interface DbAddress {
 }
 
 const categoryColors = [
-  'bg-brand-50', 'bg-amber-50', 'bg-orange-50', 'bg-yellow-50', 'bg-rose-50',
-  'bg-red-50', 'bg-sky-50', 'bg-blue-50', 'bg-teal-50', 'bg-emerald-50',
-  'bg-indigo-50', 'bg-purple-50',
+  'bg-brand-50',
+  'bg-amber-50',
+  'bg-orange-50',
+  'bg-yellow-50',
+  'bg-rose-50',
+  'bg-red-50',
+  'bg-sky-50',
+  'bg-blue-50',
+  'bg-teal-50',
+  'bg-emerald-50',
+  'bg-indigo-50',
+  'bg-purple-50',
 ];
 
 export function mapCategory(db: DbCategory, index: number, productCount?: number): Category {
@@ -157,7 +176,11 @@ export function mapOrder(db: DbOrder, items: DbOrderItem[]): Order {
   return {
     id: db.id,
     orderNo: db.order_number,
-    date: new Date(db.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    date: new Date(db.created_at).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
     itemCount: items.reduce((sum, i) => sum + i.quantity, 0),
     total: Number(db.total),
     status: statusMap[db.status] ?? 'Processing',
@@ -166,7 +189,11 @@ export function mapOrder(db: DbOrder, items: DbOrderItem[]): Order {
 }
 
 export async function fetchCategories(): Promise<{ categories: Category[]; slugMap: Record<string, string> }> {
-  const { data, error } = await supabase.from('categories').select('*').eq('is_active', true).order('sort_order');
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
   if (error) throw error;
   const slugMap: Record<string, string> = {};
   const categories = (data as DbCategory[]).map((c, i) => {
@@ -177,13 +204,24 @@ export async function fetchCategories(): Promise<{ categories: Category[]; slugM
 }
 
 export async function fetchProducts(): Promise<{ products: Product[]; categoryMap: Record<string, string> }> {
-  const { data: catData } = await supabase.from('categories').select('id, slug').eq('is_active', true);
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('id, slug')
+    .eq('is_active', true);
   const categoryMap: Record<string, string> = {};
-  (catData as DbCategory[] | null)?.forEach((c) => { categoryMap[c.id] = c.slug; });
+  (catData as DbCategory[] | null)?.forEach((c) => {
+    categoryMap[c.id] = c.slug;
+  });
 
-  const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
   if (error) throw error;
-  const products = (data as DbProduct[]).map((p) => mapProduct(p, categoryMap[p.category_id] ?? ''));
+  const products = (data as DbProduct[]).map((p) =>
+    mapProduct(p, categoryMap[p.category_id] ?? '')
+  );
   return { products, categoryMap };
 }
 
@@ -201,18 +239,33 @@ export async function fetchPromotions(): Promise<PromoBanner[]> {
 }
 
 export async function fetchProductById(id: string): Promise<{ product: Product; related: Product[] } | null> {
-  const { data, error } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
   if (error || !data) return null;
   const dbProduct = data as DbProduct;
 
-  const { data: catData } = await supabase.from('categories').select('id, slug').eq('id', dbProduct.category_id).maybeSingle();
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('id, slug')
+    .eq('id', dbProduct.category_id)
+    .maybeSingle();
   const categorySlug = (catData as DbCategory | null)?.slug ?? '';
 
   const product = mapProduct(dbProduct, categorySlug);
 
   const { data: relatedData } = await supabase
-    .from('products').select('*').eq('category_id', dbProduct.category_id).eq('is_active', true).neq('id', id).limit(6);
-  const related = (relatedData as DbProduct[] | null)?.map((p) => mapProduct(p, categorySlug)) ?? [];
+    .from('products')
+    .select('*')
+    .eq('category_id', dbProduct.category_id)
+    .eq('is_active', true)
+    .neq('id', id)
+    .limit(6);
+  const related = (relatedData as DbProduct[] | null)?.map((p) =>
+    mapProduct(p, categorySlug)
+  ) ?? [];
 
   return { product, related };
 }
@@ -232,7 +285,11 @@ export async function toggleWishlist(productId: string, isWishlisted: boolean): 
 }
 
 export async function fetchAddresses(): Promise<DbAddress[]> {
-  const { data, error } = await supabase.from('addresses').select('*').order('is_default', { ascending: false }).order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('addresses')
+    .select('*')
+    .order('is_default', { ascending: false })
+    .order('created_at', { ascending: false });
   if (error) return [];
   return data as DbAddress[];
 }
@@ -242,35 +299,59 @@ export async function deleteAddress(id: string): Promise<void> {
 }
 
 export async function fetchOrders(): Promise<Order[]> {
-  const { data: orderData, error: orderError } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+  const { data: orderData, error: orderError } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false });
   if (orderError || !orderData) return [];
 
   const orderIds = (orderData as DbOrder[]).map((o) => o.id);
   if (orderIds.length === 0) return [];
 
-  const { data: itemData } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+  const { data: itemData } = await supabase
+    .from('order_items')
+    .select('*')
+    .in('order_id', orderIds);
   const itemsByOrder: Record<string, DbOrderItem[]> = {};
   (itemData as DbOrderItem[] | null)?.forEach((item) => {
     if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
     itemsByOrder[item.order_id].push(item);
   });
 
-  return (orderData as DbOrder[]).map((o) => mapOrder(o, itemsByOrder[o.id] ?? []));
+  return (orderData as DbOrder[]).map((o) =>
+    mapOrder(o, itemsByOrder[o.id] ?? [])
+  );
 }
 
-export async function fetchOrderDetail(orderId: string): Promise<{ order: DbOrder; items: DbOrderItem[]; address: DbAddress | null } | null> {
-  const { data: order, error: oe } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+export async function fetchOrderDetail(
+  orderId: string
+): Promise<{ order: DbOrder; items: DbOrderItem[]; address: DbAddress | null } | null> {
+  const { data: order, error: oe } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .maybeSingle();
   if (oe || !order) return null;
-  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', orderId);
+  const { data: items } = await supabase
+    .from('order_items')
+    .select('*')
+    .eq('order_id', orderId);
   let address: DbAddress | null = null;
   if ((order as DbOrder).address_id) {
-    const { data: addr } = await supabase.from('addresses').select('*').eq('id', (order as DbOrder).address_id).maybeSingle();
+    const { data: addr } = await supabase
+      .from('addresses')
+      .select('*')
+      .eq('id', (order as DbOrder).address_id)
+      .maybeSingle();
     address = addr as DbAddress | null;
   }
   return { order: order as DbOrder, items: (items as DbOrderItem[]) ?? [], address };
 }
 
-export async function placeOrder(addressId: string, items: { product_id: string; quantity: number }[]): Promise<string | null> {
+export async function placeOrder(
+  addressId: string,
+  items: { product_id: string; quantity: number }[]
+): Promise<string | null> {
   const { data, error } = await supabase.rpc('create_order', {
     p_address_id: addressId,
     p_items: items,
@@ -289,8 +370,17 @@ export async function fetchProfile() {
   return data;
 }
 
-export async function updateProfile(updates: { full_name?: string; business_name?: string; avatar_url?: string; personal_name?: string; registration_status?: 'unregistered' | 'registered' }) {
-  const { error } = await supabase.from('profiles').update(updates).eq('id', (await supabase.auth.getUser()).data.user?.id);
+export async function updateProfile(updates: {
+  full_name?: string;
+  business_name?: string;
+  avatar_url?: string;
+  personal_name?: string;
+  registration_status?: 'unregistered' | 'registered';
+}) {
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', (await supabase.auth.getUser()).data.user?.id);
   if (error) throw error;
 }
 
@@ -325,7 +415,7 @@ export function mapHomeBanner(db: DbHomeBanner): PromoBanner {
     badge: db.badge ?? undefined,
     actionType: db.action_type,
     actionConfig: db.action_config,
-    position: db.position || 'top',
+    position: db.position || 'top', // ✅ important: include position
   };
 }
 
@@ -343,47 +433,59 @@ export async function fetchHomeBanners(): Promise<PromoBanner[]> {
 }
 
 export async function fetchAllHomeBanners(): Promise<HomeBanner[]> {
-  const { data, error } = await supabase.from('home_banners').select('*').order('display_order');
+  const { data, error } = await supabase
+    .from('home_banners')
+    .select('*')
+    .order('display_order');
   if (error || !data) return [];
   return data as HomeBanner[];
 }
 
-export async function createHomeBanner(input: Omit<HomeBanner, 'id' | 'created_at' | 'updated_at'>): Promise<HomeBanner | null> {
-  const { data, error } = await supabase.from('home_banners').insert({
-    badge: input.badge,
-    title: input.title,
-    description: input.description,
-    image_url: input.image_url,
-    background_color: input.background_color,
-    button_text: input.button_text,
-    action_type: input.action_type,
-    action_config: input.action_config,
-    display_order: input.display_order,
-    is_active: input.is_active,
-    position: input.position || 'top',
-    start_at: input.start_at,
-    end_at: input.end_at,
-  }).select().single();
+export async function createHomeBanner(
+  input: Omit<HomeBanner, 'id' | 'created_at' | 'updated_at'>
+): Promise<HomeBanner | null> {
+  const { data, error } = await supabase
+    .from('home_banners')
+    .insert({
+      badge: input.badge,
+      title: input.title,
+      description: input.description,
+      image_url: input.image_url,
+      background_color: input.background_color,
+      button_text: input.button_text,
+      action_type: input.action_type,
+      action_config: input.action_config,
+      display_order: input.display_order,
+      is_active: input.is_active,
+      position: input.position || 'top',
+      start_at: input.start_at,
+      end_at: input.end_at,
+    })
+    .select()
+    .single();
   if (error) throw error;
   return data as HomeBanner;
 }
 
 export async function updateHomeBanner(id: string, updates: Partial<HomeBanner>): Promise<void> {
-  const { error } = await supabase.from('home_banners').update({
-    badge: updates.badge,
-    title: updates.title,
-    description: updates.description,
-    image_url: updates.image_url,
-    background_color: updates.background_color,
-    button_text: updates.button_text,
-    action_type: updates.action_type,
-    action_config: updates.action_config,
-    display_order: updates.display_order,
-    is_active: updates.is_active,
-    position: updates.position || 'top',
-    start_at: updates.start_at,
-    end_at: updates.end_at,
-  }).eq('id', id);
+  const { error } = await supabase
+    .from('home_banners')
+    .update({
+      badge: updates.badge,
+      title: updates.title,
+      description: updates.description,
+      image_url: updates.image_url,
+      background_color: updates.background_color,
+      button_text: updates.button_text,
+      action_type: updates.action_type,
+      action_config: updates.action_config,
+      display_order: updates.display_order,
+      is_active: updates.is_active,
+      position: updates.position || 'top',
+      start_at: updates.start_at,
+      end_at: updates.end_at,
+    })
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -392,30 +494,41 @@ export async function deleteHomeBanner(id: string): Promise<void> {
 }
 
 export async function duplicateHomeBanner(id: string): Promise<HomeBanner | null> {
-  const { data: original } = await supabase.from('home_banners').select('*').eq('id', id).maybeSingle();
+  const { data: original } = await supabase
+    .from('home_banners')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
   if (!original) return null;
   const orig = original as DbHomeBanner;
-  const { data, error } = await supabase.from('home_banners').insert({
-    badge: orig.badge,
-    title: orig.title + ' (Copy)',
-    description: orig.description,
-    image_url: orig.image_url,
-    background_color: orig.background_color,
-    button_text: orig.button_text,
-    action_type: orig.action_type,
-    action_config: orig.action_config,
-    display_order: orig.display_order + 1,
-    is_active: false,
-    position: orig.position || 'top',
-    start_at: null,
-    end_at: null,
-  }).select().single();
+  const { data, error } = await supabase
+    .from('home_banners')
+    .insert({
+      badge: orig.badge,
+      title: orig.title + ' (Copy)',
+      description: orig.description,
+      image_url: orig.image_url,
+      background_color: orig.background_color,
+      button_text: orig.button_text,
+      action_type: orig.action_type,
+      action_config: orig.action_config,
+      display_order: orig.display_order + 1,
+      is_active: false,
+      position: orig.position || 'top',
+      start_at: null,
+      end_at: null,
+    })
+    .select()
+    .single();
   if (error) throw error;
   return data as HomeBanner;
 }
 
 export async function fetchFilteredProducts(filter: FilterConfig): Promise<Product[]> {
-  const { data: catData } = await supabase.from('categories').select('id, slug').eq('is_active', true);
+  const { data: catData } = await supabase
+    .from('categories')
+    .select('id, slug')
+    .eq('is_active', true);
   const categoryMap: Record<string, string> = {};
   const slugToIdMap: Record<string, string> = {};
   (catData as DbCategory[] | null)?.forEach((c) => {
@@ -459,13 +572,17 @@ export async function fetchFilteredProducts(filter: FilterConfig): Promise<Produ
   const { data, error } = await query.limit(100);
   if (error) throw error;
 
-  let products = (data as DbProduct[]).map((p) => mapProduct(p, categoryMap[p.category_id] ?? ''));
+  let products = (data as DbProduct[]).map((p) =>
+    mapProduct(p, categoryMap[p.category_id] ?? '')
+  );
 
   if (typeof filter.discount_min === 'number' || typeof filter.discount_max === 'number') {
     products = products.filter((p) => {
       const discount = p.mrp > 0 ? ((p.mrp - p.price) / p.mrp) * 100 : 0;
-      if (typeof filter.discount_min === 'number' && discount < filter.discount_min) return false;
-      if (typeof filter.discount_max === 'number' && discount > filter.discount_max) return false;
+      if (typeof filter.discount_min === 'number' && discount < filter.discount_min)
+        return false;
+      if (typeof filter.discount_max === 'number' && discount > filter.discount_max)
+        return false;
       return true;
     });
   }
@@ -488,13 +605,16 @@ export async function fetchFilteredProducts(filter: FilterConfig): Promise<Produ
 }
 
 export async function fetchAllBrands(): Promise<string[]> {
-  const { data, error } = await supabase.from('products').select('brand').eq('is_active', true);
+  const { data, error } = await supabase
+    .from('products')
+    .select('brand')
+    .eq('is_active', true);
   if (error || !data) return [];
   const brands = new Set((data as { brand: string }[]).map((r) => r.brand));
   return Array.from(brands).sort();
 }
 
-// ----- NEW: Stores -----
+// ----- STORES (CRUD) -----
 export async function fetchStores(): Promise<Store[]> {
   const { data, error } = await supabase
     .from('stores')
@@ -506,41 +626,53 @@ export async function fetchStores(): Promise<Store[]> {
 }
 
 export async function fetchAllStores(): Promise<Store[]> {
-  const { data, error } = await supabase.from('stores').select('*').order('sort_order');
+  const { data, error } = await supabase
+    .from('stores')
+    .select('*')
+    .order('sort_order');
   if (error) return [];
   return data as Store[];
 }
 
-export async function createStore(input: Omit<Store, 'id' | 'created_at' | 'updated_at'>): Promise<Store | null> {
-  const { data, error } = await supabase.from('stores').insert({
-    name: input.name,
-    image_url: input.image_url,
-    description: input.description,
-    theme_bg: input.theme_bg,
-    theme_border: input.theme_border,
-    theme_text: input.theme_text,
-    theme_accent: input.theme_accent,
-    product_ids: input.product_ids,
-    sort_order: input.sort_order,
-    is_active: input.is_active,
-  }).select().single();
+export async function createStore(
+  input: Omit<Store, 'id' | 'created_at' | 'updated_at'>
+): Promise<Store | null> {
+  const { data, error } = await supabase
+    .from('stores')
+    .insert({
+      name: input.name,
+      image_url: input.image_url,
+      description: input.description,
+      theme_bg: input.theme_bg,
+      theme_border: input.theme_border,
+      theme_text: input.theme_text,
+      theme_accent: input.theme_accent,
+      product_ids: input.product_ids,
+      sort_order: input.sort_order,
+      is_active: input.is_active,
+    })
+    .select()
+    .single();
   if (error) throw error;
   return data as Store;
 }
 
 export async function updateStore(id: string, updates: Partial<Store>): Promise<void> {
-  const { error } = await supabase.from('stores').update({
-    name: updates.name,
-    image_url: updates.image_url,
-    description: updates.description,
-    theme_bg: updates.theme_bg,
-    theme_border: updates.theme_border,
-    theme_text: updates.theme_text,
-    theme_accent: updates.theme_accent,
-    product_ids: updates.product_ids,
-    sort_order: updates.sort_order,
-    is_active: updates.is_active,
-  }).eq('id', id);
+  const { error } = await supabase
+    .from('stores')
+    .update({
+      name: updates.name,
+      image_url: updates.image_url,
+      description: updates.description,
+      theme_bg: updates.theme_bg,
+      theme_border: updates.theme_border,
+      theme_text: updates.theme_text,
+      theme_accent: updates.theme_accent,
+      product_ids: updates.product_ids,
+      sort_order: updates.sort_order,
+      is_active: updates.is_active,
+    })
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -548,7 +680,7 @@ export async function deleteStore(id: string): Promise<void> {
   await supabase.from('stores').delete().eq('id', id);
 }
 
-// ----- NEW: Trusted Brands -----
+// ----- TRUSTED BRANDS (CRUD) -----
 export async function fetchTrustedBrands(): Promise<TrustedBrand[]> {
   const { data, error } = await supabase
     .from('trusted_brands')
@@ -560,29 +692,41 @@ export async function fetchTrustedBrands(): Promise<TrustedBrand[]> {
 }
 
 export async function fetchAllTrustedBrands(): Promise<TrustedBrand[]> {
-  const { data, error } = await supabase.from('trusted_brands').select('*').order('sort_order');
+  const { data, error } = await supabase
+    .from('trusted_brands')
+    .select('*')
+    .order('sort_order');
   if (error) return [];
   return data as TrustedBrand[];
 }
 
-export async function createTrustedBrand(input: Omit<TrustedBrand, 'id' | 'created_at' | 'updated_at'>): Promise<TrustedBrand | null> {
-  const { data, error } = await supabase.from('trusted_brands').insert({
-    name: input.name,
-    logo_url: input.logo_url,
-    sort_order: input.sort_order,
-    is_active: input.is_active,
-  }).select().single();
+export async function createTrustedBrand(
+  input: Omit<TrustedBrand, 'id' | 'created_at' | 'updated_at'>
+): Promise<TrustedBrand | null> {
+  const { data, error } = await supabase
+    .from('trusted_brands')
+    .insert({
+      name: input.name,
+      logo_url: input.logo_url,
+      sort_order: input.sort_order,
+      is_active: input.is_active,
+    })
+    .select()
+    .single();
   if (error) throw error;
   return data as TrustedBrand;
 }
 
 export async function updateTrustedBrand(id: string, updates: Partial<TrustedBrand>): Promise<void> {
-  const { error } = await supabase.from('trusted_brands').update({
-    name: updates.name,
-    logo_url: updates.logo_url,
-    sort_order: updates.sort_order,
-    is_active: updates.is_active,
-  }).eq('id', id);
+  const { error } = await supabase
+    .from('trusted_brands')
+    .update({
+      name: updates.name,
+      logo_url: updates.logo_url,
+      sort_order: updates.sort_order,
+      is_active: updates.is_active,
+    })
+    .eq('id', id);
   if (error) throw error;
 }
 
