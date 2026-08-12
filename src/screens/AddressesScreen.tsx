@@ -1,20 +1,35 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, MapPin, Navigation, Check, Trash2, Plus, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Navigation, Check, Trash2, Plus, Loader2, Pencil } from 'lucide-react';
 import type { DbAddress } from '@/services/catalog';
 import { fetchAddresses, deleteAddress } from '@/services/catalog';
 import { saveDeliveryAddress as saveAddress } from '@/services/business';
-import { supabase } from '@/lib/supabase';
+import { LocationPicker } from '@/components/LocationPicker';
 
 interface AddressesScreenProps { onBack: () => void; onSaved?: () => void; }
+
+const EMPTY_FORM = {
+  label: 'Business',
+  recipient_name: '',
+  phone: '',
+  line1: '',
+  line2: '',
+  city: '',
+  state: '',
+  postal_code: '',
+  latitude: null as number | null,
+  longitude: null as number | null,
+  place_id: null as string | null,
+  is_default: false,
+};
 
 export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
   const [addresses, setAddresses] = useState<DbAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ label: 'Business', recipient_name: '', phone: '', line1: '', line2: '', city: '', state: '', postal_code: '', latitude: null as number | null, longitude: null as number | null, place_id: null as string | null, is_default: false });
+  const [showPicker, setShowPicker] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [locating, setLocating] = useState(false);
 
   const load = useCallback(async () => {
     const data = await fetchAddresses();
@@ -24,28 +39,22 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const getCurrentLocation = async () => {
-    setLocating(true);
-    setError('');
-    try {
-      if ('geolocation' in navigator) {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
-        });
-        const { latitude, longitude } = pos.coords;
-        setForm((f) => ({ ...f, latitude, longitude }));
-        const { data } = await supabase.functions.invoke('maps', { body: { action: 'reverse_geocode', lat: latitude, lng: longitude } });
-        if (data?.address) {
-          const a = data.address;
-          setForm((f) => ({ ...f, line1: a.line1 || f.line1, city: a.city || f.city, state: a.state || f.state, postal_code: a.postal_code || f.postal_code, place_id: a.place_id ?? null }));
-        }
-      } else {
-        setError('Location not available on this device.');
-      }
-    } catch {
-      setError('Could not get your location. Please enter address manually.');
-    }
-    setLocating(false);
+  const handleLocationConfirmed = (loc: {
+    latitude: number; longitude: number;
+    line1: string; city: string; state: string; postal_code: string; place_id: string | null;
+  }) => {
+    setForm((f) => ({
+      ...f,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      line1: loc.line1 || f.line1,
+      city: loc.city || f.city,
+      state: loc.state || f.state,
+      postal_code: loc.postal_code || f.postal_code,
+      place_id: loc.place_id,
+    }));
+    setShowPicker(false);
+    setShowForm(true);
   };
 
   const handleSave = async () => {
@@ -58,10 +67,10 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
     try {
       await saveAddress(form);
       setShowForm(false);
-      setForm({ label: 'Business', recipient_name: '', phone: '', line1: '', line2: '', city: '', state: '', postal_code: '', latitude: null, longitude: null, place_id: null, is_default: false });
+      setForm({ ...EMPTY_FORM });
       await load();
       onSaved?.();
-    } catch (err) {
+    } catch {
       setError('Could not save address. Please try again.');
     }
     setSaving(false);
@@ -74,6 +83,15 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
 
   if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="h-8 w-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" /></div>;
 
+  if (showPicker) {
+    return (
+      <LocationPicker
+        onConfirm={handleLocationConfirmed}
+        onCancel={() => setShowPicker(false)}
+      />
+    );
+  }
+
   return (
     <div className="px-4 pb-6 space-y-4">
       <div className="flex items-center gap-3">
@@ -83,12 +101,16 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
           <p className="text-xs text-ink-500 mt-0.5">Manage your delivery locations</p>
         </div>
       </div>
+
       {addresses.length === 0 && !showForm ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <div className="h-20 w-20 rounded-3xl bg-brand-50 flex items-center justify-center text-brand-600"><MapPin size={36} strokeWidth={1.5} /></div>
           <h2 className="text-lg font-extrabold text-ink-900 mt-5">No addresses saved</h2>
           <p className="text-sm text-ink-500 mt-1 max-w-[250px]">Add a delivery address to start placing orders.</p>
-          <button onClick={() => setShowForm(true)} className="mt-5 h-11 px-5 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center gap-2"><Plus size={17} /> Add address</button>
+          <div className="mt-5 flex flex-col gap-2 w-full max-w-[280px]">
+            <button onClick={() => setShowPicker(true)} className="h-11 px-5 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><Navigation size={17} /> Pick on map</button>
+            <button onClick={() => setShowForm(true)} className="h-11 px-5 rounded-xl border-2 border-ink-200 text-ink-700 text-sm font-bold flex items-center justify-center gap-2"><Plus size={17} /> Enter manually</button>
+          </div>
         </div>
       ) : showForm ? (
         <div className="space-y-3">
@@ -97,15 +119,18 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
               <h2 className="text-sm font-bold text-ink-900">New address</h2>
               <button onClick={() => setShowForm(false)} className="text-xs font-bold text-ink-400">Cancel</button>
             </div>
-            <button onClick={getCurrentLocation} disabled={locating} className="w-full h-11 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 text-brand-700 text-sm font-bold flex items-center justify-center gap-2">
-              {locating ? <><Loader2 size={16} className="animate-spin" /> Getting location...</> : <><Navigation size={16} /> Use my current location</>}
+
+            <button onClick={() => setShowPicker(true)} className="w-full h-11 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 text-brand-700 text-sm font-bold flex items-center justify-center gap-2">
+              <MapPin size={16} /> {form.latitude ? 'Change location on map' : 'Pick location on map'}
             </button>
+
             {form.latitude && form.longitude && (
               <div className="rounded-xl bg-brand-50 border border-brand-100 p-2.5 flex items-center gap-2">
                 <MapPin size={15} className="text-brand-600" />
                 <p className="text-xs text-brand-800">Location set: {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}</p>
               </div>
             )}
+
             <div className="grid grid-cols-2 gap-2">
               <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Label (Home, Shop)" className="h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
               <input value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} placeholder="Recipient name *" className="h-10 rounded-xl border border-ink-200 px-3 text-sm outline-none focus:border-brand-500" />
@@ -146,7 +171,10 @@ export function AddressesScreen({ onBack, onSaved }: AddressesScreenProps) {
               </div>
             ))}
           </div>
-          <button onClick={() => setShowForm(true)} className="w-full h-12 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 text-brand-700 text-sm font-bold flex items-center justify-center gap-2"><Plus size={17} /> Add new address</button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowPicker(true)} className="flex-1 h-12 rounded-xl bg-brand-600 text-white text-sm font-bold flex items-center justify-center gap-2"><MapPin size={17} /> Pick on map</button>
+            <button onClick={() => setShowForm(true)} className="flex-1 h-12 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50 text-brand-700 text-sm font-bold flex items-center justify-center gap-2"><Plus size={17} /> Enter manually</button>
+          </div>
         </>
       )}
     </div>
