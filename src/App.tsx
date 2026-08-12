@@ -15,19 +15,24 @@ import { WishlistScreen } from '@/screens/WishlistScreen';
 import { AdminScreen } from '@/screens/AdminScreen';
 import { WarehouseScreen } from '@/screens/WarehouseScreen';
 import { DeliveryScreen } from '@/screens/DeliveryScreen';
-import type { Category, Product, ScreenName } from '@/types';
+import { FilteredProductsScreen } from '@/screens/FilteredProductsScreen';
+import { BusinessRegistrationScreen } from '@/screens/BusinessRegistrationScreen';
+import type { Category, Product, ScreenName, FilterConfig, PromoBanner, Business } from '@/types';
 import { useCart } from '@/store';
 import { useAuth } from '@/auth';
 import { AuthScreen } from '@/screens/AuthScreen';
+import { handleHomeAction, type ActionContext } from '@/services/actionResolver';
 
 function App() {
   const cart = useCart();
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, profile } = useAuth();
   const [screen, setScreen] = useState<ScreenName>('home');
   const [search, setSearch] = useState('');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showSplash, setShowSplash] = useState(true);
+  const [filterConfig, setFilterConfig] = useState<FilterConfig | null>(null);
+  const [filterTitle, setFilterTitle] = useState('Products');
 
   const goTo = (next: ScreenName) => {
     setScreen(next);
@@ -45,6 +50,23 @@ function App() {
     setScreen('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const actionCtx: ActionContext = {
+    setScreen: goTo,
+    setSearch,
+    openProduct,
+    openCategory,
+    setFilterConfig,
+    setFilterTitle,
+  };
+
+  const handleBannerAction = (banner: PromoBanner) => {
+    handleHomeAction(banner.actionType, banner.actionConfig, actionCtx);
+  };
+
+  const handleBusinessRegistered = (_business: Business) => {
+    goTo('checkout');
+  };
   const openOrder = (orderId: string) => {
     setSelectedOrderId(orderId);
     setScreen('orderDetail');
@@ -59,11 +81,17 @@ function App() {
   if (!user) return <>{showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />} {!showSplash && <AuthScreen />}</>;
 
   let content;
-  if (screen === 'home') content = <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} />;
+  if (screen === 'home') content = <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} onBannerAction={handleBannerAction} />;
   else if (screen === 'categories') content = <CategoriesScreen onCategory={openCategory} />;
   else if (screen === 'orders') content = <OrdersScreen onOrderClick={openOrder} />;
   else if (screen === 'cart') content = <CartScreen cart={cart} onProduct={openProduct} onShop={() => goTo('home')} onCheckout={() => goTo('checkout')} />;
-  else if (screen === 'checkout') content = <CheckoutScreen cart={cart} onBack={() => goTo('cart')} onOrderPlaced={openOrder} onAddAddress={() => goTo('addresses')} />;
+  else if (screen === 'checkout') {
+    if (profile?.registration_status !== 'registered') {
+      content = <BusinessRegistrationScreen onBack={() => goTo('cart')} onRegistered={handleBusinessRegistered} />;
+    } else {
+      content = <CheckoutScreen cart={cart} onBack={() => goTo('cart')} onOrderPlaced={openOrder} onAddAddress={() => goTo('addresses')} />;
+    }
+  }
   else if (screen === 'orderDetail' && selectedOrderId) content = <OrderDetailScreen orderId={selectedOrderId} onBack={() => goTo('orders')} />;
   else if (screen === 'addresses') content = <AddressesScreen onBack={() => goTo('account')} onSaved={() => goTo('checkout')} />;
   else if (screen === 'wishlist') content = <WishlistScreen cart={cart} onProduct={openProduct} onShop={() => goTo('home')} />;
@@ -72,7 +100,9 @@ function App() {
   else if (screen === 'warehouse') content = role === 'admin' || role === 'warehouse_manager' ? <WarehouseScreen onBack={() => goTo('account')} /> : <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} />;
   else if (screen === 'delivery') content = role === 'admin' || role === 'delivery_partner' ? <DeliveryScreen onBack={() => goTo('account')} /> : <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} />;
   else if (screen === 'product' && selectedProductId) content = <ProductDetailScreen productId={selectedProductId} cart={cart} onBack={() => goTo('home')} onProduct={openProduct} />;
-  else content = <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} />;
+  else if (screen === 'filteredProducts' && filterConfig) content = <FilteredProductsScreen filter={filterConfig} title={filterTitle} cart={cart} onBack={() => goTo('home')} onProduct={openProduct} />;
+  else if (screen === 'businessRegistration') content = <BusinessRegistrationScreen onBack={() => goTo('account')} onRegistered={handleBusinessRegistered} />;
+  else content = <HomeScreen search={search} onSearchChange={setSearch} onCategory={openCategory} onProduct={openProduct} onViewAll={() => goTo('categories')} cart={cart} onBannerAction={handleBannerAction} />;
 
   return <div className="min-h-screen bg-ink-100">{showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}<div className="mx-auto min-h-screen max-w-[720px] bg-ink-50 shadow-2xl shadow-ink-200/50"><Header cartCount={cart.totalItems} onCartClick={() => goTo('cart')} /><main className="py-4 pb-24 animate-fade-up">{content}</main><BottomNavigation active={screen} cartCount={cart.totalItems} onNavigate={goTo} /></div></div>;
 }

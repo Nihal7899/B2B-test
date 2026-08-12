@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowLeft, MapPin, Navigation, Check, Trash2, Plus, Loader2 } from 'lucide-react';
 import type { DbAddress } from '@/services/catalog';
-import { fetchAddresses, saveAddress, deleteAddress } from '@/services/catalog';
+import { fetchAddresses, deleteAddress } from '@/services/catalog';
+import { saveDeliveryAddress as saveAddress } from '@/services/business';
 import { supabase } from '@/lib/supabase';
 
 interface AddressesScreenProps { onBack: () => void; onSaved?: () => void; }

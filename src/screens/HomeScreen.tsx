@@ -9,9 +9,9 @@ import { ProductCarousel } from '@/components/ProductCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { fetchCategories, fetchProducts, fetchPromotions } from '@/services/catalog';
 
-interface HomeScreenProps { search: string; onSearchChange: (value: string) => void; onCategory: (category: Category) => void; onProduct: (product: Product) => void; onViewAll: () => void; cart: ReturnType<typeof useCart>; }
+interface HomeScreenProps { search: string; onSearchChange: (value: string) => void; onCategory: (category: Category) => void; onProduct: (product: Product) => void; onViewAll: () => void; cart: ReturnType<typeof useCart>; onBannerAction?: (banner: PromoBanner) => void; }
 
-export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onViewAll, cart }: HomeScreenProps) {
+export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onViewAll, cart, onBannerAction }: HomeScreenProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [promotions, setPromotions] = useState<PromoBanner[]>([]);
@@ -41,7 +41,7 @@ export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onVi
   return (
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
-      {!query && promotions.length > 0 && <PromoCarousel banners={promotions.slice(0, 3)} />}
+      {!query && promotions.length > 0 && <PromoCarousel banners={promotions.slice(0, 3)} onAction={onBannerAction} />}
       {query ? (
         <div className="px-4">
           <p className="text-xs text-ink-500 mb-3">{filtered.length} products found for <span className="font-bold text-ink-700">"{search}"</span></p>

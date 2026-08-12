@@ -1,10 +1,11 @@
-import type { PromoBanner } from '../types';
+import type { PromoBanner } from '@/types';
 
 interface PromoBannerCardProps {
   banner: PromoBanner;
+  onAction?: (banner: PromoBanner) => void;
 }
 
-export function PromoBannerCard({ banner }: PromoBannerCardProps) {
+export function PromoBannerCard({ banner, onAction }: PromoBannerCardProps) {
   return (
     <div className={`relative overflow-hidden rounded-2xl ${banner.bgClass} ${banner.textClass} shadow-soft min-h-[124px] flex`}>
       <div className="flex-1 p-4 flex flex-col justify-between z-10 min-w-0">
@@ -17,7 +18,7 @@ export function PromoBannerCard({ banner }: PromoBannerCardProps) {
           <h3 className="text-[17px] font-extrabold leading-tight tracking-tight">{banner.headline}</h3>
           <p className="text-[11px] opacity-90 mt-1 leading-snug line-clamp-2">{banner.subtext}</p>
         </div>
-        <button className="mt-2.5 self-start bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5 tap-highlight active:scale-95 transition-transform shadow-sm">
+        <button onClick={() => onAction?.(banner)} className="mt-2.5 self-start bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5 tap-highlight active:scale-95 transition-transform shadow-sm">
           {banner.cta}
         </button>
       </div>
@@ -31,14 +32,15 @@ export function PromoBannerCard({ banner }: PromoBannerCardProps) {
 
 interface PromoCarouselProps {
   banners: PromoBanner[];
+  onAction?: (banner: PromoBanner) => void;
 }
 
-export function PromoCarousel({ banners }: PromoCarouselProps) {
+export function PromoCarousel({ banners, onAction }: PromoCarouselProps) {
   return (
     <div className="flex gap-3 overflow-x-auto no-scrollbar scroll-touch px-4 pb-1">
       {banners.map((banner) => (
         <div key={banner.id} className="scroll-snap-item shrink-0 w-[85%] max-w-[340px]">
-          <PromoBannerCard banner={banner} />
+          <PromoBannerCard banner={banner} onAction={onAction} />
         </div>
       ))}
     </div>

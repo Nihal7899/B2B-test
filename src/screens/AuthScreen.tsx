@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, LockKeyhole, MessageSquare, Phone, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, LockKeyhole, Phone, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/auth';
 
 const groceryImage = 'https://images.pexels.com/photos/7363163/pexels-photo-7363163.jpeg?auto=compress&cs=tinysrgb&h=650&w=940';
@@ -11,7 +11,6 @@ function normalizeIndianPhone(value: string): string {
 export function AuthScreen() {
   const { sendOtp, verifyOtp, resendOtp } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [seconds, setSeconds] = useState(0);
@@ -30,9 +29,9 @@ export function AuthScreen() {
   const formattedPhone = useMemo(() => `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`.trim(), [phone]);
 
   const handleSendOtp = async () => {
-    if (!isPhoneValid || !name.trim()) { setError('Enter your name and a valid 10-digit mobile number.'); return; }
+    if (!isPhoneValid) { setError('Enter a valid 10-digit mobile number.'); return; }
     setBusy(true); setError('');
-    const result = await sendOtp(`+91${phone}`, name);
+    const result = await sendOtp(`+91${phone}`);
     setBusy(false);
     if (result.error) { setError(result.error); return; }
     setSent(true); setStep('otp'); setSeconds(30);
@@ -82,14 +81,9 @@ export function AuthScreen() {
             <>
               <div className="mb-5">
                 <h2 className="text-xl font-extrabold text-ink-900">Welcome to Stackknit</h2>
-                <p className="mt-1 text-sm text-ink-500">Wholesale groceries at prices built for business.</p>
+                <p className="mt-1 text-sm text-ink-500">Sign in with your mobile number to continue.</p>
               </div>
-              <label className="block text-xs font-bold text-ink-700">Your name</label>
-              <div className="relative mt-2">
-                <MessageSquare size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your full name" className="h-12 w-full rounded-xl border border-ink-200 bg-ink-50 pl-10 pr-3 text-sm outline-none transition focus:border-brand-500 focus:bg-white focus:ring-4 focus:ring-brand-50" />
-              </div>
-              <label className="mt-4 block text-xs font-bold text-ink-700">Mobile number</label>
+              <label className="block text-xs font-bold text-ink-700">Mobile number</label>
               <div className="mt-2 flex h-12 overflow-hidden rounded-xl border border-ink-200 bg-ink-50 focus-within:border-brand-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-brand-50">
                 <div className="flex items-center gap-1.5 border-r border-ink-200 px-3 text-sm font-bold text-ink-700">
                   <span className="text-base">🇮🇳</span><span>+91</span>

@@ -4,15 +4,27 @@ import { supabase } from '@/lib/supabase';
 
 export type AppRole = 'admin' | 'warehouse_manager' | 'delivery_partner' | 'customer';
 
+export interface ProfileData {
+  id: string;
+  personal_name: string | null;
+  full_name: string;
+  phone: string;
+  business_name: string;
+  avatar_url: string | null;
+  registration_status: 'unregistered' | 'registered';
+}
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   role: AppRole | null;
+  profile: ProfileData | null;
   loading: boolean;
-  sendOtp: (phone: string, fullName: string) => Promise<{ error: string | null }>;
+  sendOtp: (phone: string) => Promise<{ error: string | null }>;
   verifyOtp: (phone: string, token: string) => Promise<{ error: string | null }>;
   resendOtp: (phone: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -24,6 +36,7 @@ function readableAuthError(): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadRole = useCallback(async (userId: string) => {
@@ -36,12 +49,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole((data?.role as AppRole | undefined) ?? 'customer');
   }, []);
 
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase.from('profiles').select('id, personal_name, full_name, phone, business_name, avatar_url, registration_status').eq('id', userId).maybeSingle();
+    if (error) {
+      console.error('Could not load profile', error);
+      setProfile(null);
+      return;
+    }
+    if (data) {
+      setProfile(data as ProfileData);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session);
-      if (data.session?.user) void loadRole(data.session.user.id);
+      if (data.session?.user) {
+        void loadRole(data.session.user.id);
+        void loadProfile(data.session.user.id);
+      }
       setLoading(false);
     });
 
@@ -49,18 +77,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(nextSession);
       if (nextSession?.user) {
-        void (async () => { await loadRole(nextSession.user.id); })();
+        void (async () => {
+          await loadRole(nextSession.user.id);
+          await loadProfile(nextSession.user.id);
+        })();
       } else {
         setRole(null);
+        setProfile(null);
       }
       if (event === 'SIGNED_OUT') setLoading(false);
     });
 
     return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [loadRole]);
+  }, [loadRole, loadProfile]);
 
-  const sendOtp = useCallback(async (phone: string, fullName: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ phone, options: { data: { full_name: fullName.trim() } } });
+  const sendOtp = useCallback(async (phone: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ phone, options: { shouldCreateUser: true } });
     return { error: error ? readableAuthError() : null };
   }, []);
 
@@ -78,9 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setRole(null);
+    setProfile(null);
   }, []);
 
-  const value = useMemo(() => ({ session, user: session?.user ?? null, role, loading, sendOtp, verifyOtp, resendOtp, signOut }), [session, role, loading, sendOtp, verifyOtp, resendOtp, signOut]);
+  const refreshProfile = useCallback(async () => {
+    if (session?.user) await loadProfile(session.user.id);
+  }, [session, loadProfile]);
+
+  const value = useMemo(() => ({ session, user: session?.user ?? null, role, profile, loading, sendOtp, verifyOtp, resendOtp, signOut, refreshProfile }), [session, role, profile, loading, sendOtp, verifyOtp, resendOtp, signOut, refreshProfile]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -21,6 +21,9 @@ Deno.serve(async (req: Request) => {
     const key = Deno.env.get("GOOGLE_MAPS_API_KEY") ?? Deno.env.get("MAPS_API_KEY");
     if (!key) return json({ error: "Maps service is unavailable" }, 503);
     const body = await req.json() as { action?: string; lat?: number; lng?: number; query?: string };
+    if (body.action === "get_api_key") {
+      return json({ api_key: key });
+    }
     let url: string;
     if (body.action === "reverse_geocode" && typeof body.lat === "number" && typeof body.lng === "number") {
       url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(`${body.lat},${body.lng}`)}&key=${encodeURIComponent(key)}`;

@@ -44,8 +44,8 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
         });
         if (payErr || !payData?.razorpay_order_id) {
           setError('Payment setup failed, but your order is placed. Pay on delivery.');
-        } else if (typeof window !== 'undefined' && (window as Record<string, unknown>).Razorpay) {
-          const Razorpay = (window as Record<string, unknown>).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
+        } else if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).Razorpay) {
+          const Razorpay = (window as unknown as Record<string, unknown>).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
           const rzp = new Razorpay({
             key: import.meta.env.VITE_RAZORPAY_KEY_ID,
             amount: Math.round(total * 100),
