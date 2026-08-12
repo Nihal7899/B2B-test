@@ -403,6 +403,7 @@ export interface DbHomeBanner {
   updated_at: string;
 }
 
+// ✅ IMPORTANT: mapHomeBanner MUST include position
 export function mapHomeBanner(db: DbHomeBanner): PromoBanner {
   return {
     id: db.id,
@@ -415,7 +416,7 @@ export function mapHomeBanner(db: DbHomeBanner): PromoBanner {
     badge: db.badge ?? undefined,
     actionType: db.action_type,
     actionConfig: db.action_config,
-    position: db.position || 'top', // ✅ important: include position
+    position: db.position || 'top', // ✅ position is set here
   };
 }
 
