@@ -23,13 +23,20 @@ export function handleHomeAction(
   switch (actionType) {
     case 'VIEW_CATEGORY': {
       const categoryId = config.category_id as string;
+      const categoryIds = config.category_ids as string[];
       const categoryName = config.category_name as string || 'Category';
-      if (categoryId) {
+
+      // If we have an array of category IDs, use them all
+      if (categoryIds && Array.isArray(categoryIds) && categoryIds.length > 0) {
+        ctx.setFilterConfig({ category_ids: categoryIds });
+        ctx.setFilterTitle(categoryName || 'Categories');
+        ctx.setScreen('filteredProducts');
+      } else if (categoryId) {
         ctx.setFilterConfig({ category_ids: [categoryId] });
         ctx.setFilterTitle(categoryName);
         ctx.setScreen('filteredProducts');
       } else {
-        console.warn('VIEW_CATEGORY: missing category_id');
+        console.warn('VIEW_CATEGORY: missing category_id or category_ids');
       }
       break;
     }
@@ -38,8 +45,7 @@ export function handleHomeAction(
       const productId = config.product_id as string;
       const productName = config.product_name as string || '';
       if (productId) {
-        // Use search as a fallback; ideally we would fetch the product and call openProduct.
-        // For simplicity, search by product name or ID.
+        // Fallback: search by product name or ID
         ctx.setSearch(productName || productId);
         ctx.setScreen('home');
       }
@@ -67,7 +73,6 @@ export function handleHomeAction(
     case 'FILTER_PRODUCTS': {
       const filter: FilterConfig = {};
 
-      // category_ids – expect slugs or UUIDs; we'll pass them as-is
       if (config.category_ids && Array.isArray(config.category_ids) && config.category_ids.length > 0) {
         filter.category_ids = config.category_ids as string[];
       }
@@ -96,12 +101,9 @@ export function handleHomeAction(
         filter.sort = config.sort as FilterConfig['sort'];
       }
 
-      // If no meaningful filter is set, fall back to viewing all products or show warning.
       const hasFilter = Object.keys(filter).length > 0;
       if (!hasFilter) {
         console.warn('FILTER_PRODUCTS: no filter criteria provided. Showing all products.');
-        // Optionally, set filter to empty to show all products, or do nothing.
-        // We'll set an empty filter to show all products.
         ctx.setFilterConfig({});
       } else {
         ctx.setFilterConfig(filter);
@@ -117,7 +119,7 @@ export function handleHomeAction(
       const collectionId = config.collection_id as string;
       const collectionName = config.name as string || 'Collection';
       if (collectionId) {
-        // In a full implementation, you'd fetch the collection's filter_config.
+        // In a full implementation, fetch the collection's filter_config.
         // For now, navigate to filteredProducts with an empty filter.
         ctx.setFilterConfig({});
         ctx.setFilterTitle(collectionName);
