@@ -1,30 +1,72 @@
+// screens/HomeScreen.tsx
 import { useEffect, useState } from 'react';
 import { ArrowRight, Truck, ShieldCheck, Tag, RotateCcw } from 'lucide-react';
-import type { Category, Product, PromoBanner } from '@/types';
+import type { Category, Product, PromoBanner, Store, TrustedBrand } from '@/types';
 import type { useCart } from '@/store';
 import { SearchBar } from '@/components/SearchBar';
 import { PromoCarousel } from '@/components/PromoBanner';
+import { PromoAdBanner } from '@/components/PromoAdBanner';
 import { CategoryCarousel } from '@/components/CategoryCard';
 import { ProductCarousel } from '@/components/ProductCard';
 import { SectionHeader } from '@/components/SectionHeader';
-import { fetchCategories, fetchProducts, fetchHomeBanners } from '@/services/catalog';
+import { StoreCarousel } from '@/components/StoreCard';
+import { BrandCarousel } from '@/components/BrandCard';
+import { fetchCategories, fetchProducts, fetchHomeBanners, fetchStores, fetchTrustedBrands } from '@/services/catalog';
 
-interface HomeScreenProps { search: string; onSearchChange: (value: string) => void; onCategory: (category: Category) => void; onProduct: (product: Product) => void; onViewAll: () => void; cart: ReturnType<typeof useCart>; onBannerAction?: (banner: PromoBanner) => void; }
+interface HomeScreenProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  onCategory: (category: Category) => void;
+  onProduct: (product: Product) => void;
+  onViewAll: () => void;
+  onStoreClick: (store: Store) => void;
+  cart: ReturnType<typeof useCart>;
+  onBannerAction?: (banner: PromoBanner) => void;
+}
 
-export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onViewAll, cart, onBannerAction }: HomeScreenProps) {
+export function HomeScreen({
+  search,
+  onSearchChange,
+  onCategory,
+  onProduct,
+  onViewAll,
+  onStoreClick,
+  cart,
+  onBannerAction,
+}: HomeScreenProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [promotions, setPromotions] = useState<PromoBanner[]>([]);
+  const [banners, setBanners] = useState<PromoBanner[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [brands, setBrands] = useState<TrustedBrand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [topBanner, setTopBanner] = useState<PromoBanner | null>(null);
+  const [middleBanner, setMiddleBanner] = useState<PromoBanner | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [catRes, prodRes, bannerRes] = await Promise.all([fetchCategories(), fetchProducts(), fetchHomeBanners()]);
+        const [catRes, prodRes, bannerRes, storesRes, brandsRes] = await Promise.all([
+          fetchCategories(),
+          fetchProducts(),
+          fetchHomeBanners(),
+          fetchStores(),
+          fetchTrustedBrands(),
+        ]);
         setCategories(catRes.categories);
         setProducts(prodRes.products);
-        setPromotions(bannerRes);
-      } catch (err) { console.error('Failed to load catalog', err); }
+        setBanners(bannerRes);
+        setStores(storesRes);
+        setBrands(brandsRes);
+
+        // Separate banners by position
+        const top = bannerRes.find((b) => b.position === 'top') || null;
+        const middle = bannerRes.find((b) => b.position === 'middle') || null;
+        setTopBanner(top);
+        setMiddleBanner(middle);
+      } catch (err) {
+        console.error('Failed to load catalog', err);
+      }
       setLoading(false);
     })();
   }, []);
@@ -34,17 +76,33 @@ export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onVi
   const popular = filtered.slice(0, 8);
   const deals = filtered.slice(8, 16);
   const essentials = filtered.slice(16, 24);
-  const actions = { getQuantity: cart.getQuantity, onAdd: cart.addToCart, onIncrement: (p: Product) => cart.addToCart(p), onDecrement: (p: Product) => cart.updateQuantity(p.id, cart.getQuantity(p.id) - 1), onProductClick: onProduct, onViewAll };
+
+  const actions = {
+    getQuantity: cart.getQuantity,
+    onAdd: cart.addToCart,
+    onIncrement: (p: Product) => cart.addToCart(p),
+    onDecrement: (p: Product) => cart.updateQuantity(p.id, cart.getQuantity(p.id) - 1),
+    onProductClick: onProduct,
+    onViewAll,
+  };
 
   if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><div className="h-8 w-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin" /></div>;
 
   return (
     <div className="space-y-6 pb-6">
       <SearchBar value={search} onChange={onSearchChange} onFilter={() => undefined} />
-      {!query && promotions.length > 0 && <PromoCarousel banners={promotions.slice(0, 3)} onAction={onBannerAction} />}
+
+      {/* Top Ad Banner - rounded rectangle with image background */}
+      {!query && topBanner && <PromoAdBanner banner={topBanner} onAction={onBannerAction} />}
+
+      {/* Promo Carousel */}
+      {!query && banners.length > 0 && <PromoCarousel banners={banners.slice(0, 3)} onAction={onBannerAction} />}
+
       {query ? (
         <div className="px-4">
-          <p className="text-xs text-ink-500 mb-3">{filtered.length} products found for <span className="font-bold text-ink-700">"{search}"</span></p>
+          <p className="text-xs text-ink-500 mb-3">
+            {filtered.length} products found for <span className="font-bold text-ink-700">"{search}"</span>
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filtered.map((p) => (
               <div key={p.id} className="bg-white border border-ink-100 rounded-2xl shadow-card overflow-hidden">
@@ -74,23 +132,58 @@ export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onVi
         </div>
       ) : (
         <>
+          {/* Categories */}
           <section>
             <SectionHeader title="Shop by Category" subtitle="Everything your business needs" onViewAll={onViewAll} accent="bg-brand-600" />
             <CategoryCarousel categories={categories.slice(0, 10)} onCategoryClick={onCategory} />
           </section>
-          {popular.length > 0 && <ProductCarousel title="Popular Products" products={popular} {...actions} />}
-          <section className="px-4">
-            <div className="relative overflow-hidden rounded-2xl bg-accent-50 border border-accent-100 min-h-[116px] flex items-center">
-              <div className="p-4 relative z-10 w-[65%]">
-                <span className="text-[9px] font-bold text-accent-700 tracking-wider uppercase">LIMITED TIME</span>
-                <h3 className="text-[17px] font-extrabold text-ink-900 mt-1 leading-tight">Fresh stocks.<br /><span className="text-accent-600">Fresh savings.</span></h3>
-                <p className="text-[11px] text-ink-600 mt-1">Up to 20% off on everyday essentials</p>
-              </div>
-              <img src="https://images.pexels.com/photos/37321079/pexels-photo-37321079.jpeg?auto=compress&cs=tinysrgb&h=650&w=940" alt="Fresh vegetables" className="absolute right-0 top-0 h-full w-[44%] object-cover" />
-              <div className="absolute right-[35%] top-0 h-full w-20 bg-gradient-to-r from-accent-50 to-transparent" />
+
+          {/* Stores */}
+          {stores.length > 0 && (
+            <div>
+              <SectionHeader title="Shop by Stores" subtitle="Curated collections" accent="bg-purple-600" />
+              <StoreCarousel stores={stores} onStoreClick={onStoreClick} />
             </div>
-          </section>
+          )}
+
+          {/* Trusted Brands */}
+          {brands.length > 0 && (
+            <div>
+              <SectionHeader title="Trusted Brands" subtitle="Quality you can rely on" accent="bg-blue-600" />
+              <BrandCarousel brands={brands} />
+            </div>
+          )}
+
+          {/* Popular Products */}
+          {popular.length > 0 && <ProductCarousel title="Popular Products" products={popular} {...actions} />}
+
+          {/* Middle Ad Banner - dynamic from DB */}
+          {middleBanner && (
+            <section className="px-4">
+              <div className="relative overflow-hidden rounded-2xl min-h-[116px] flex items-center" style={{ background: middleBanner.background_color || 'bg-accent-50' }}>
+                <div className="p-4 relative z-10 w-[65%]">
+                  {middleBanner.badge && (
+                    <span className="text-[9px] font-bold text-accent-700 tracking-wider uppercase">{middleBanner.badge}</span>
+                  )}
+                  <h3 className="text-[17px] font-extrabold text-ink-900 mt-1 leading-tight">{middleBanner.headline}</h3>
+                  <p className="text-[11px] text-ink-600 mt-1">{middleBanner.subtext}</p>
+                  <button
+                    onClick={() => onBannerAction?.(middleBanner)}
+                    className="mt-2.5 bg-white text-ink-900 text-xs font-bold rounded-lg px-3.5 py-1.5"
+                  >
+                    {middleBanner.cta}
+                  </button>
+                </div>
+                <img src={middleBanner.image} alt={middleBanner.headline} className="absolute right-0 top-0 h-full w-[44%] object-cover" />
+                <div className="absolute right-[35%] top-0 h-full w-20 bg-gradient-to-r from-accent-50 to-transparent" />
+              </div>
+            </section>
+          )}
+
+          {/* Wholesale Deals */}
           {deals.length > 0 && <ProductCarousel title="Wholesale Deals" products={deals} {...actions} />}
+
+          {/* Perks */}
           <section className="px-4">
             <div className="grid grid-cols-2 gap-2.5">
               <div className="rounded-2xl bg-brand-50 border border-brand-100 p-3.5 min-h-[118px]"><Truck className="text-brand-600" size={21} /><h3 className="font-bold text-sm text-brand-900 mt-3">Fast delivery</h3><p className="text-[10px] text-brand-700 mt-1">Same day in Bengaluru</p></div>
@@ -99,7 +192,11 @@ export function HomeScreen({ search, onSearchChange, onCategory, onProduct, onVi
               <div className="rounded-2xl bg-sky-50 border border-sky-100 p-3.5 min-h-[118px]"><RotateCcw className="text-sky-600" size={21} /><h3 className="font-bold text-sm text-sky-900 mt-3">Easy returns</h3><p className="text-[10px] text-sky-700 mt-1">Simple, hassle-free</p></div>
             </div>
           </section>
+
+          {/* Everyday Essentials */}
           {essentials.length > 0 && <ProductCarousel title="Everyday Essentials" products={essentials} {...actions} />}
+
+          {/* Bottom CTA */}
           <section className="mx-4 rounded-2xl bg-brand-950 p-5 text-white flex items-center justify-between overflow-hidden relative">
             <div className="relative z-10">
               <p className="text-[9px] text-brand-300 font-bold tracking-widest uppercase">BUILT FOR BUSINESS</p>

@@ -160,3 +160,29 @@ export interface SmartCollection {
   created_at: string;
   updated_at: string;
 }
+
+export interface Store {
+  id: string;
+  name: string;
+  image_url: string;
+  description: string;
+  theme_bg: string;
+  theme_border: string;
+  theme_text: string;
+  theme_accent: string;
+  product_ids: string[];
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrustedBrand {
+  id: string;
+  name: string;
+  logo_url: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
