@@ -485,3 +485,116 @@ to authenticated
 using (
   user_id = auth.uid()
 );
+
+-- =========================================================
+-- ORDERS
+-- DELIVERY PARTNER: Can view only orders assigned to them
+-- =========================================================
+
+create policy "Delivery partners can view assigned orders"
+on public.orders
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.delivery_assignments da
+    where da.order_id = orders.id
+      and da.delivery_partner_id = auth.uid()
+  )
+);
+
+
+-- =========================================================
+-- ORDER_ITEMS
+-- DELIVERY PARTNER: Can view items from their assigned orders
+-- =========================================================
+
+create policy "Delivery partners can view assigned order items"
+on public.order_items
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.delivery_assignments da
+    where da.order_id = order_items.order_id
+      and da.delivery_partner_id = auth.uid()
+  )
+);
+
+-- =========================================================
+-- ADDRESSES
+-- DELIVERY PARTNER: Can view addresses for assigned orders
+-- =========================================================
+
+create policy "Delivery partners can view assigned order addresses"
+on public.addresses
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.orders o
+    join public.delivery_assignments da
+      on da.order_id = o.id
+    where o.address_id = addresses.id
+      and da.delivery_partner_id = auth.uid()
+  )
+);
+
+-- =========================================================
+-- ADDRESSES
+-- =========================================================
+
+-- WAREHOUSE MANAGER: Can view all addresses
+create policy "Warehouse managers can view all addresses"
+on public.addresses
+for select
+to authenticated
+using (
+  auth_helpers.is_warehouse_manager()
+);
+
+
+-- USER: Can view their own addresses
+create policy "Users can view own addresses"
+on public.addresses
+for select
+to authenticated
+using (
+  user_id = auth.uid()
+);
+
+
+-- USER: Can insert their own address
+create policy "Users can insert own addresses"
+on public.addresses
+for insert
+to authenticated
+with check (
+  user_id = auth.uid()
+);
+
+
+-- USER: Can update their own addresses
+create policy "Users can update own addresses"
+on public.addresses
+for update
+to authenticated
+using (
+  user_id = auth.uid()
+)
+with check (
+  user_id = auth.uid()
+);
+
+
+-- USER: Can delete their own addresses
+create policy "Users can delete own addresses"
+on public.addresses
+for delete
+to authenticated
+using (
+  user_id = auth.uid()
+);
