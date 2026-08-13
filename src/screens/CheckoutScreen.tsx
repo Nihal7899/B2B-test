@@ -22,6 +22,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [paymentAlertMsg, setPaymentAlertMsg] = useState('');
   const keepAliveIntervalRef = useRef<number | null>(null);
+  const isSubmittingRef = useRef(false);
 
   const load = useCallback(async () => {
     const data = await fetchAddresses();
@@ -72,7 +73,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
       } catch (e) {
         // silent fail
       }
-    }, 5 * 60 * 1000); // every 5 minutes
+    }, 5 * 60 * 1000);
   };
 
   const stopKeepAlive = () => {
@@ -83,12 +84,18 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
   };
 
   const handlePlaceOrder = async () => {
+    // Prevent concurrent submissions
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     if (!selectedAddr) {
       setError('Please select a delivery address.');
+      isSubmittingRef.current = false;
       return;
     }
     setPlacing(true);
     setError('');
+
     try {
       const items = cart.items.map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
       const orderId = await placeOrder(selectedAddr, items);
@@ -111,6 +118,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
           setPlacing(false);
           sessionStorage.removeItem('active_checkout');
           sessionStorage.removeItem('checkout_order_id');
+          isSubmittingRef.current = false;
           return;
         }
 
@@ -123,13 +131,13 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
           setPlacing(false);
           sessionStorage.removeItem('active_checkout');
           sessionStorage.removeItem('checkout_order_id');
+          isSubmittingRef.current = false;
           return;
         }
 
         const Razorpay = (window as any).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
         let paymentSucceeded = false;
 
-        // Start keep-alive pings
         startKeepAlive(orderId);
 
         const rzp = new Razorpay({
@@ -155,6 +163,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
                 setPlacing(false);
                 sessionStorage.removeItem('active_checkout');
                 sessionStorage.removeItem('checkout_order_id');
+                isSubmittingRef.current = false;
                 return;
               }
               paymentSucceeded = true;
@@ -169,6 +178,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
               setPlacing(false);
               sessionStorage.removeItem('active_checkout');
               sessionStorage.removeItem('checkout_order_id');
+              isSubmittingRef.current = false;
             }
           },
           modal: {
@@ -183,6 +193,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
                 setPlacing(false);
                 sessionStorage.removeItem('active_checkout');
                 sessionStorage.removeItem('checkout_order_id');
+                isSubmittingRef.current = false;
               }
             },
           },
@@ -195,7 +206,6 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
           body: { action: 'create_cod_payment', order_id: orderId, amount: total },
         });
         if (codPayError) {
-          // Rollback: cancel the order if payment record creation fails
           await supabase.functions.invoke('razorpay', {
             body: { action: 'cancel_order', order_id: orderId },
           });
@@ -212,8 +222,10 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
       sessionStorage.removeItem('active_checkout');
       sessionStorage.removeItem('checkout_order_id');
       stopKeepAlive();
+    } finally {
+      setPlacing(false);
+      isSubmittingRef.current = false;
     }
-    setPlacing(false);
   };
 
   if (loading) {
