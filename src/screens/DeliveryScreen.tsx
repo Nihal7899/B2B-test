@@ -10,35 +10,103 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data: assignData } = await supabase.from('delivery_assignments').select('*').order('created_at', { ascending: false });
-    if (!assignData) { setLoading(false); return; }
-    const results = await Promise.all((assignData as { id: string; order_id: string; status: string; picked_up_at: string | null; delivered_at: string | null }[]).map(async (a) => {
-      const { data: order } = await supabase.from('orders').select('*').eq('id', a.order_id).maybeSingle();
-      if (!order) return null;
-      const { data: items } = await supabase.from('order_items').select('*').eq('order_id', a.order_id);
-      let address: DbAddress | null = null;
-      if ((order as DbOrder).address_id) {
-        const { data: addr } = await supabase.from('addresses').select('*').eq('id', (order as DbOrder).address_id as string).maybeSingle();
-        address = addr as DbAddress | null;
+    try {
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
       }
-      return { assignment: a, order: order as DbOrder, items: (items as DbOrderItem[]) ?? [], address };
-    }));
-    setAssignments(results.filter((r): r is NonNullable<typeof r> => r !== null));
-    setLoading(false);
+
+      // Fetch assignments for this delivery partner only
+      const { data: assignData, error: assignError } = await supabase
+        .from('delivery_assignments')
+        .select('*')
+        .eq('delivery_partner_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (assignError) {
+        console.error('Error fetching assignments:', assignError);
+        setLoading(false);
+        return;
+      }
+
+      if (!assignData || assignData.length === 0) {
+        setAssignments([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch order details, items, and addresses for each assignment
+      const results = await Promise.all(
+        (assignData as { id: string; order_id: string; status: string; picked_up_at: string | null; delivered_at: string | null }[])
+          .map(async (a) => {
+            // Fetch order
+            const { data: order } = await supabase
+              .from('orders')
+              .select('*')
+              .eq('id', a.order_id)
+              .maybeSingle();
+            if (!order) return null;
+
+            // Fetch order items
+            const { data: items } = await supabase
+              .from('order_items')
+              .select('*')
+              .eq('order_id', a.order_id);
+
+            // Fetch address if exists
+            let address: DbAddress | null = null;
+            if ((order as DbOrder).address_id) {
+              const { data: addr } = await supabase
+                .from('addresses')
+                .select('*')
+                .eq('id', (order as DbOrder).address_id as string)
+                .maybeSingle();
+              address = addr as DbAddress | null;
+            }
+
+            return {
+              assignment: a,
+              order: order as DbOrder,
+              items: (items as DbOrderItem[]) ?? [],
+              address,
+            };
+          })
+      );
+
+      setAssignments(results.filter((r): r is NonNullable<typeof r> => r !== null));
+    } catch (err) {
+      console.error('Unexpected error in load:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
-
-  const markPickedUp = async (assignmentId: string, orderId: string) => {
-    await supabase.from('delivery_assignments').update({ status: 'out_for_delivery', picked_up_at: new Date().toISOString() }).eq('id', assignmentId);
-    await supabase.from('orders').update({ status: 'out_for_delivery' }).eq('id', orderId);
+  useEffect(() => {
     void load();
-  };
+  }, [load]);
 
-  const markDelivered = async (assignmentId: string, orderId: string) => {
-    await supabase.from('delivery_assignments').update({ status: 'delivered', delivered_at: new Date().toISOString() }).eq('id', assignmentId);
-    await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId);
-    void load();
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) void load();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  // --- Use RPC function to update delivery status (bypasses RLS) ---
+  const completeDelivery = async (assignmentId: string, status: 'out_for_delivery' | 'delivered') => {
+    const { error } = await supabase.rpc('complete_delivery', {
+      p_assignment_id: assignmentId,
+      p_status: status,
+    });
+    if (error) {
+      console.error('Error updating delivery:', error);
+      alert('Could not update delivery: ' + error.message);
+    } else {
+      void load();
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><Loader2 size={28} className="animate-spin text-brand-600" /></div>;
@@ -100,9 +168,27 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                 </div>
               )}
               <div className="flex gap-2">
-                {assignment.status === 'ready_for_pickup' && <button onClick={() => void markPickedUp(assignment.id, order.id)} className="flex-1 h-10 rounded-xl bg-brand-600 text-white text-xs font-bold flex items-center justify-center gap-1.5"><Package size={15} /> Mark picked up</button>}
-                {assignment.status === 'out_for_delivery' && <button onClick={() => void markDelivered(assignment.id, order.id)} className="flex-1 h-10 rounded-xl bg-brand-600 text-white text-xs font-bold flex items-center justify-center gap-1.5"><CheckCircle2 size={15} /> Mark delivered</button>}
-                {assignment.status === 'delivered' && <div className="flex-1 h-10 rounded-xl bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center gap-1.5"><CheckCircle2 size={15} /> Delivered</div>}
+                {assignment.status === 'ready_for_pickup' && (
+                  <button
+                    onClick={() => void completeDelivery(assignment.id, 'out_for_delivery')}
+                    className="flex-1 h-10 rounded-xl bg-brand-600 text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <Package size={15} /> Mark picked up
+                  </button>
+                )}
+                {assignment.status === 'out_for_delivery' && (
+                  <button
+                    onClick={() => void completeDelivery(assignment.id, 'delivered')}
+                    className="flex-1 h-10 rounded-xl bg-brand-600 text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 size={15} /> Mark delivered
+                  </button>
+                )}
+                {assignment.status === 'delivered' && (
+                  <div className="flex-1 h-10 rounded-xl bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center gap-1.5">
+                    <CheckCircle2 size={15} /> Delivered
+                  </div>
+                )}
               </div>
             </div>
           ))}
