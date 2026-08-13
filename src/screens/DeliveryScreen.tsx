@@ -1,157 +1,16 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   ArrowLeft, Package, Truck, CheckCircle2, MapPin, Loader2,
-  Navigation, Phone, ChevronRight, PhoneCall
+  PhoneCall, Navigation
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { DbOrder, DbOrderItem, DbAddress } from '@/services/catalog';
+import { SlideToConfirm } from '@/components/SlideToConfirm';
 
 interface DeliveryScreenProps {
   onBack: () => void;
 }
 
-// ---------- Modern Slide‑to‑Confirm Component ----------
-interface SlideToConfirmProps {
-  onConfirm: () => void;
-  label: string;
-  isLoading?: boolean;
-  disabled?: boolean;
-}
-
-function SlideToConfirm({ onConfirm, label, isLoading = false, disabled = false }: SlideToConfirmProps) {
-  const [progress, setProgress] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
-
-  const snapBack = () => setProgress(0);
-
-  const handleStart = (clientX: number) => {
-    if (isLoading || disabled) return;
-    setIsDragging(true);
-  };
-
-  const handleMove = (clientX: number) => {
-    if (!isDragging || !trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const max = rect.width - 56; // thumb width ~56px
-    const pct = Math.min(Math.max(x / max, 0), 1);
-    setProgress(pct);
-  };
-
-  const handleEnd = () => {
-    setIsDragging(false);
-    if (progress >= 0.9) {
-      onConfirm();
-    } else {
-      snapBack();
-    }
-  };
-
-  // Mouse events
-  const onMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    handleStart(e.clientX);
-  };
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
-    const onMouseUp = () => handleEnd();
-    if (isDragging) {
-      window.addEventListener('mousemove', onMouseMove);
-      window.addEventListener('mouseup', onMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [isDragging, progress]);
-
-  // Touch events
-  const onTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleStart(e.touches[0].clientX);
-  };
-  useEffect(() => {
-    const onTouchMove = (e: TouchEvent) => handleMove(e.touches[0].clientX);
-    const onTouchEnd = () => handleEnd();
-    if (isDragging) {
-      window.addEventListener('touchmove', onTouchMove, { passive: true });
-      window.addEventListener('touchend', onTouchEnd);
-    }
-    return () => {
-      window.removeEventListener('touchmove', onTouchMove);
-      window.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [isDragging, progress]);
-
-  // Snap back when loading starts
-  useEffect(() => {
-    if (isLoading) snapBack();
-  }, [isLoading]);
-
-  const thumbLeft = `calc(${progress * 100}% - ${progress * 56}px)`;
-  const fillWidth = `${progress * 100}%`;
-
-  return (
-    <div
-      ref={trackRef}
-      className={`relative h-14 rounded-2xl overflow-hidden select-none touch-none ${
-        disabled || isLoading ? 'opacity-50 pointer-events-none' : ''
-      }`}
-      style={{
-        background: 'rgba(255,255,255,0.3)',
-        backdropFilter: 'blur(8px)',
-        boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,255,255,0.5)',
-      }}
-    >
-      {/* Fill track */}
-      <div
-        className="absolute left-0 top-0 h-full transition-all duration-150 ease-out rounded-2xl"
-        style={{
-          width: fillWidth,
-          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-          boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2)',
-        }}
-      />
-
-      {/* Label - slides with progress */}
-      <div
-        className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-ink-800 pointer-events-none transition-all duration-200"
-        style={{
-          color: progress > 0.4 ? 'white' : '#1e293b',
-          mixBlendMode: progress > 0.4 ? 'normal' : 'multiply',
-        }}
-      >
-        {isLoading ? (
-          <Loader2 size={22} className="animate-spin text-white" />
-        ) : (
-          label
-        )}
-      </div>
-
-      {/* Thumb - floating round with shadow */}
-      <div
-        ref={thumbRef}
-        className="absolute top-1/2 -translate-y-1/2 h-12 w-14 bg-white rounded-2xl shadow-lg flex items-center justify-center transition-all duration-150 ease-out cursor-grab active:cursor-grabbing"
-        style={{
-          left: thumbLeft,
-          boxShadow: '0 4px 12px rgba(99,102,241,0.3), 0 0 0 1px rgba(255,255,255,0.2)',
-        }}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-      >
-        <ChevronRight
-          size={22}
-          className="text-indigo-500 transition-transform duration-200"
-          style={{ transform: `translateX(${progress * 4}px)` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ---------- Main Component ----------
 export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
   const [assignments, setAssignments] = useState<
     {
@@ -350,7 +209,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                   </p>
                 </div>
 
-                {/* Address with modern call/navigate buttons */}
+                {/* Address with inline Call & Navigate */}
                 {address && (
                   <div className="rounded-xl bg-ink-50 p-3 space-y-2">
                     <div className="flex items-start gap-2">
@@ -367,7 +226,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                       </div>
                     </div>
 
-                    {/* Modern action buttons */}
+                    {/* Inline Call / Navigate buttons (modern capsules) */}
                     <div className="flex items-center gap-3 pt-1">
                       <a
                         href={`tel:${address.phone}`}
@@ -391,7 +250,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                   </div>
                 )}
 
-                {/* Slide‑to‑confirm action */}
+                {/* Slide‑to‑confirm */}
                 <div className="pt-1">
                   {assignment.status === 'ready_for_pickup' && (
                     <SlideToConfirm
