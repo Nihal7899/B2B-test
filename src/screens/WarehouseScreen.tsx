@@ -36,101 +36,116 @@ function OrdersTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'packed' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled'>('all');
 
 const load = useCallback(async () => {
-  // Fetch all orders with their payment info
-  const { data: orderData, error } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      payments!left(status, provider)
-    `)
-    .order('created_at', { ascending: false });
+  try {
+    // 1. Fetch all orders
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching orders:', error);
-    setLoading(false);
-    return;
-  }
-
-  // Log the raw data to see the structure (remove after debugging)
-  console.log('Raw orders with payments:', orderData);
-
-  // Get delivery partners - fetch user_ids first
-  const { data: partnerRoles } = await supabase
-    .from('user_roles')
-    .select('user_id')
-    .eq('role', 'delivery_partner');
-
-  if (partnerRoles && partnerRoles.length > 0) {
-    const partnerIds = partnerRoles.map((r) => r.user_id);
-    const { data: partnerProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', partnerIds);
-    
-    if (partnerProfiles) {
-      const profileMap = Object.fromEntries(
-        partnerProfiles.map((p) => [p.id, p.full_name || 'Partner'])
-      );
-      setPartners(
-        partnerRoles.map((r) => ({
-          user_id: r.user_id,
-          name: profileMap[r.user_id] || 'Partner',
-        }))
-      );
+    if (orderError) {
+      console.error('Error fetching orders:', orderError);
+      setLoading(false);
+      return;
     }
-  }
 
-  if (orderData) {
-    // Client-side filtering: keep only actionable orders
-    const actionableOrders = (orderData as any[]).filter((order) => {
-      // If not pending, always show
+    // 2. Fetch payments for these orders
+    const orderIds = (orderData || []).map((o) => o.id);
+    let paymentsMap: Record<string, any> = {};
+    if (orderIds.length > 0) {
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .in('order_id', orderIds);
+
+      if (payments) {
+        // Build map of order_id -> payment object
+        payments.forEach((p) => {
+          paymentsMap[p.order_id] = p;
+        });
+      }
+    }
+
+    // 3. Merge orders with their payment
+    const ordersWithPayments = (orderData || []).map((order) => ({
+      ...order,
+      payments: paymentsMap[order.id] || null,
+    }));
+
+    // 4. Filter actionable orders
+    const actionableOrders = ordersWithPayments.filter((order) => {
       if (order.status !== 'pending') return true;
-      
-      // If pending, check payment(s)
-      const payments = order.payments;
-      // payments can be null, undefined, an array, or an object depending on the join
-      if (!payments) return false;
-      
-      // Ensure payments is an array
-      const paymentArray = Array.isArray(payments) ? payments : [payments];
-      
-      // Check if any payment is valid (paid online or COD)
-      return paymentArray.some((p: any) => 
-        p.status === 'paid' || p.provider === 'cod'
-      );
+      const payment = order.payments;
+      if (!payment) return false;
+      return payment.status === 'paid' || payment.provider === 'cod';
     });
 
-    // Log the filtered count for debugging
     console.log(`Actionable orders: ${actionableOrders.length}`);
 
-    const orderIds = actionableOrders.map((o) => o.id);
-    if (orderIds.length > 0) {
+    // 5. Get delivery partners
+    const { data: partnerRoles } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'delivery_partner');
+
+    if (partnerRoles && partnerRoles.length > 0) {
+      const partnerIds = partnerRoles.map((r) => r.user_id);
+      const { data: partnerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', partnerIds);
+
+      if (partnerProfiles) {
+        const profileMap = Object.fromEntries(
+          partnerProfiles.map((p) => [p.id, p.full_name || 'Partner'])
+        );
+        setPartners(
+          partnerRoles.map((r) => ({
+            user_id: r.user_id,
+            name: profileMap[r.user_id] || 'Partner',
+          }))
+        );
+      }
+    }
+
+    // 6. Fetch order items for actionable orders
+    const actionableIds = actionableOrders.map((o) => o.id);
+    let itemsMap: Record<string, DbOrderItem[]> = {};
+    if (actionableIds.length > 0) {
       const { data: itemData } = await supabase
         .from('order_items')
         .select('*')
-        .in('order_id', orderIds);
-        
-      const itemsMap: Record<string, DbOrderItem[]> = {};
-      (itemData as DbOrderItem[] | null)?.forEach((item) => {
-        if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
-        itemsMap[item.order_id].push(item);
-      });
-      setItems(itemsMap);
-    } else {
-      setItems({});
-    }
+        .in('order_id', actionableIds);
 
-    const ordersWithNames = await Promise.all(actionableOrders.map(async (o) => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', o.user_id)
-        .maybeSingle();
-      return { ...o, customer_name: (profile as { full_name: string } | null)?.full_name ?? 'Customer' };
-    }));
+      if (itemData) {
+        itemData.forEach((item) => {
+          if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
+          itemsMap[item.order_id].push(item);
+        });
+      }
+    }
+    setItems(itemsMap);
+
+    // 7. Fetch customer names
+    const ordersWithNames = await Promise.all(
+      actionableOrders.map(async (o) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', o.user_id)
+          .maybeSingle();
+        return {
+          ...o,
+          customer_name: (profile as { full_name: string } | null)?.full_name ?? 'Customer',
+        };
+      })
+    );
     setOrders(ordersWithNames);
+  } catch (err) {
+    console.error('Unexpected error in load:', err);
+  } finally {
+    setLoading(false);
   }
-  setLoading(false);
 }, []);
 
   useEffect(() => { void load(); }, [load]);
