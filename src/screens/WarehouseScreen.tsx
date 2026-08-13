@@ -36,46 +36,60 @@ function OrdersTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'packed' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled'>('all');
 
   const load = useCallback(async () => {
-    // Fetch only actionable orders: pending with valid payment, or non-pending
+    // Fetch only actionable orders with correct filter syntax
     const { data: orderData, error } = await supabase
       .from('orders')
       .select(`
         *,
         payments!left(status, provider)
       `)
-      .or(`status.neq.pending, and(status.eq.pending, payments.status.eq.paid), and(status.eq.pending, payments.provider.eq.cod)`)
+      // All non-pending orders
+      .or('status.neq.pending')
+      // Pending orders with paid online payment
+      .or('and(status.eq.pending, payments.status.eq.paid)')
+      // Pending orders with COD payment
+      .or('and(status.eq.pending, payments.provider.eq.cod)')
       .order('created_at', { ascending: false });
-
+  
     if (error) {
-      console.error(error);
+      console.error('Error fetching orders:', error);
       setLoading(false);
       return;
     }
-
+  
     // Get delivery partners
     const { data: partnerRoles } = await supabase
       .from('user_roles')
       .select('user_id, profiles!inner(full_name)')
       .eq('role', 'delivery_partner');
+      
     if (partnerRoles) {
       setPartners(partnerRoles.map((r: Record<string, unknown>) => {
         const p = r.profiles as { full_name: string };
         return { user_id: r.user_id as string, name: p.full_name || 'Partner' };
       }));
     }
-
+  
     if (orderData) {
       const orderIds = (orderData as any[]).map((o) => o.id);
-      const { data: itemData } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+      const { data: itemData } = await supabase
+        .from('order_items')
+        .select('*')
+        .in('order_id', orderIds);
+        
       const itemsMap: Record<string, DbOrderItem[]> = {};
       (itemData as DbOrderItem[] | null)?.forEach((item) => {
         if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
         itemsMap[item.order_id].push(item);
       });
       setItems(itemsMap);
-
+  
       const ordersWithNames = await Promise.all((orderData as any[]).map(async (o) => {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', o.user_id).maybeSingle();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', o.user_id)
+          .maybeSingle();
         return { ...o, customer_name: (profile as { full_name: string } | null)?.full_name ?? 'Customer' };
       }));
       setOrders(ordersWithNames);
