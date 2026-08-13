@@ -36,7 +36,7 @@ function OrdersTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'packed' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled'>('all');
 
   const load = useCallback(async () => {
-    // Fetch all orders with their payment info (no complex filters)
+    // Fetch all orders with their payment info
     const { data: orderData, error } = await supabase
       .from('orders')
       .select(`
@@ -51,25 +51,36 @@ function OrdersTab() {
       return;
     }
   
-    // Get delivery partners
+    // Get delivery partners - fetch user_ids first
     const { data: partnerRoles } = await supabase
       .from('user_roles')
-      .select('user_id, profiles!inner(full_name)')
+      .select('user_id')
       .eq('role', 'delivery_partner');
+  
+    if (partnerRoles && partnerRoles.length > 0) {
+      const partnerIds = partnerRoles.map((r) => r.user_id);
+      const { data: partnerProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', partnerIds);
       
-    if (partnerRoles) {
-      setPartners(partnerRoles.map((r: Record<string, unknown>) => {
-        const p = r.profiles as { full_name: string };
-        return { user_id: r.user_id as string, name: p.full_name || 'Partner' };
-      }));
+      if (partnerProfiles) {
+        const profileMap = Object.fromEntries(
+          partnerProfiles.map((p) => [p.id, p.full_name || 'Partner'])
+        );
+        setPartners(
+          partnerRoles.map((r) => ({
+            user_id: r.user_id,
+            name: profileMap[r.user_id] || 'Partner',
+          }))
+        );
+      }
     }
   
     if (orderData) {
       // Client-side filtering: keep only actionable orders
       const actionableOrders = (orderData as any[]).filter((order) => {
-        // If status is not 'pending', it's actionable
         if (order.status !== 'pending') return true;
-        // If it's pending, check payment status/provider
         const payment = order.payments;
         if (payment && (payment.status === 'paid' || payment.provider === 'cod')) {
           return true;
@@ -78,17 +89,21 @@ function OrdersTab() {
       });
   
       const orderIds = actionableOrders.map((o) => o.id);
-      const { data: itemData } = await supabase
-        .from('order_items')
-        .select('*')
-        .in('order_id', orderIds);
-        
-      const itemsMap: Record<string, DbOrderItem[]> = {};
-      (itemData as DbOrderItem[] | null)?.forEach((item) => {
-        if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
-        itemsMap[item.order_id].push(item);
-      });
-      setItems(itemsMap);
+      if (orderIds.length > 0) {
+        const { data: itemData } = await supabase
+          .from('order_items')
+          .select('*')
+          .in('order_id', orderIds);
+          
+        const itemsMap: Record<string, DbOrderItem[]> = {};
+        (itemData as DbOrderItem[] | null)?.forEach((item) => {
+          if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
+          itemsMap[item.order_id].push(item);
+        });
+        setItems(itemsMap);
+      } else {
+        setItems({});
+      }
   
       const ordersWithNames = await Promise.all(actionableOrders.map(async (o) => {
         const { data: profile } = await supabase
