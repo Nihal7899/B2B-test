@@ -36,19 +36,13 @@ function OrdersTab() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'packed' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled'>('all');
 
   const load = useCallback(async () => {
-    // Fetch only actionable orders with correct filter syntax
+    // Fetch all orders with their payment info (no complex filters)
     const { data: orderData, error } = await supabase
       .from('orders')
       .select(`
         *,
         payments!left(status, provider)
       `)
-      // All non-pending orders
-      .or('status.neq.pending')
-      // Pending orders with paid online payment
-      .or('and(status.eq.pending, payments.status.eq.paid)')
-      // Pending orders with COD payment
-      .or('and(status.eq.pending, payments.provider.eq.cod)')
       .order('created_at', { ascending: false });
   
     if (error) {
@@ -71,7 +65,19 @@ function OrdersTab() {
     }
   
     if (orderData) {
-      const orderIds = (orderData as any[]).map((o) => o.id);
+      // Client-side filtering: keep only actionable orders
+      const actionableOrders = (orderData as any[]).filter((order) => {
+        // If status is not 'pending', it's actionable
+        if (order.status !== 'pending') return true;
+        // If it's pending, check payment status/provider
+        const payment = order.payments;
+        if (payment && (payment.status === 'paid' || payment.provider === 'cod')) {
+          return true;
+        }
+        return false;
+      });
+  
+      const orderIds = actionableOrders.map((o) => o.id);
       const { data: itemData } = await supabase
         .from('order_items')
         .select('*')
@@ -84,7 +90,7 @@ function OrdersTab() {
       });
       setItems(itemsMap);
   
-      const ordersWithNames = await Promise.all((orderData as any[]).map(async (o) => {
+      const ordersWithNames = await Promise.all(actionableOrders.map(async (o) => {
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
