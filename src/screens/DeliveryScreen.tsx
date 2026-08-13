@@ -10,7 +10,7 @@ interface DeliveryScreenProps {
   onBack: () => void;
 }
 
-// ---------- Slide‑to‑Confirm Component ----------
+// ---------- Modern Slide‑to‑Confirm Component ----------
 interface SlideToConfirmProps {
   onConfirm: () => void;
   label: string;
@@ -35,7 +35,7 @@ function SlideToConfirm({ onConfirm, label, isLoading = false, disabled = false 
     if (!isDragging || !trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
     const x = clientX - rect.left;
-    const max = rect.width - 48; // thumb width approx 48px
+    const max = rect.width - 56; // thumb width ~56px
     const pct = Math.min(Math.max(x / max, 0), 1);
     setProgress(pct);
   };
@@ -85,52 +85,67 @@ function SlideToConfirm({ onConfirm, label, isLoading = false, disabled = false 
     };
   }, [isDragging, progress]);
 
-  // Snap back if loading starts
+  // Snap back when loading starts
   useEffect(() => {
     if (isLoading) snapBack();
   }, [isLoading]);
 
-  const thumbLeft = `calc(${progress * 100}% - ${progress * 48}px)`;
+  const thumbLeft = `calc(${progress * 100}% - ${progress * 56}px)`;
+  const fillWidth = `${progress * 100}%`;
 
   return (
     <div
       ref={trackRef}
-      className={`relative h-12 rounded-xl overflow-hidden select-none touch-none ${
-        disabled || isLoading ? 'opacity-60' : ''
+      className={`relative h-14 rounded-2xl overflow-hidden select-none touch-none ${
+        disabled || isLoading ? 'opacity-50 pointer-events-none' : ''
       }`}
       style={{
-        background: 'linear-gradient(90deg, #e5e7eb, #d1d5db)',
-        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
+        background: 'rgba(255,255,255,0.3)',
+        backdropFilter: 'blur(8px)',
+        boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(255,255,255,0.5)',
       }}
     >
-      {/* Track fill */}
+      {/* Fill track */}
       <div
-        className="absolute left-0 top-0 h-full transition-all duration-75"
+        className="absolute left-0 top-0 h-full transition-all duration-150 ease-out rounded-2xl"
         style={{
-          width: `${progress * 100}%`,
-          background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
-          borderRadius: 'inherit',
+          width: fillWidth,
+          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2)',
         }}
       />
 
-      {/* Label */}
-      <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-ink-700 pointer-events-none">
+      {/* Label - slides with progress */}
+      <div
+        className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-ink-800 pointer-events-none transition-all duration-200"
+        style={{
+          color: progress > 0.4 ? 'white' : '#1e293b',
+          mixBlendMode: progress > 0.4 ? 'normal' : 'multiply',
+        }}
+      >
         {isLoading ? (
-          <Loader2 size={20} className="animate-spin text-white" />
+          <Loader2 size={22} className="animate-spin text-white" />
         ) : (
-          <span className="mix-blend-multiply">{label}</span>
+          label
         )}
       </div>
 
-      {/* Thumb */}
+      {/* Thumb - floating round with shadow */}
       <div
         ref={thumbRef}
-        className="absolute top-1/2 -translate-y-1/2 h-10 w-12 bg-white rounded-xl shadow-md flex items-center justify-center transition-all duration-75 cursor-grab active:cursor-grabbing"
-        style={{ left: thumbLeft }}
+        className="absolute top-1/2 -translate-y-1/2 h-12 w-14 bg-white rounded-2xl shadow-lg flex items-center justify-center transition-all duration-150 ease-out cursor-grab active:cursor-grabbing"
+        style={{
+          left: thumbLeft,
+          boxShadow: '0 4px 12px rgba(99,102,241,0.3), 0 0 0 1px rgba(255,255,255,0.2)',
+        }}
         onMouseDown={onMouseDown}
         onTouchStart={onTouchStart}
       >
-        <ChevronRight size={20} className="text-brand-600" />
+        <ChevronRight
+          size={22}
+          className="text-indigo-500 transition-transform duration-200"
+          style={{ transform: `translateX(${progress * 4}px)` }}
+        />
       </div>
     </div>
   );
@@ -245,7 +260,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 size={28} className="animate-spin text-brand-600" />
+        <Loader2 size={28} className="animate-spin text-indigo-600" />
       </div>
     );
   }
@@ -258,7 +273,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="h-9 w-9 rounded-xl bg-white border border-ink-200 flex items-center justify-center"
+          className="h-9 w-9 rounded-xl bg-white border border-ink-200 flex items-center justify-center shadow-sm"
         >
           <ArrowLeft size={18} />
         </button>
@@ -270,7 +285,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
 
       {assignments.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-          <div className="h-20 w-20 rounded-3xl bg-brand-50 flex items-center justify-center text-brand-600">
+          <div className="h-20 w-20 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600">
             <Truck size={36} strokeWidth={1.5} />
           </div>
           <h2 className="text-lg font-extrabold text-ink-900 mt-5">No deliveries assigned</h2>
@@ -290,7 +305,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                 {/* Order header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                    <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                       <Package size={18} />
                     </div>
                     <div>
@@ -303,7 +318,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                   <span
                     className={`text-[9px] font-bold rounded-full px-2.5 py-1 ${
                       assignment.status === 'delivered'
-                        ? 'bg-brand-100 text-brand-700'
+                        ? 'bg-green-100 text-green-700'
                         : assignment.status === 'out_for_delivery'
                         ? 'bg-sky-100 text-sky-700'
                         : 'bg-amber-100 text-amber-700'
@@ -330,16 +345,16 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                 {/* Total */}
                 <div className="flex justify-between items-center border-t border-ink-100 pt-2">
                   <p className="text-[10px] text-ink-400">Total</p>
-                  <p className="text-sm font-extrabold text-brand-700">
+                  <p className="text-sm font-extrabold text-indigo-700">
                     ₹{Number(order.total).toLocaleString('en-IN')}
                   </p>
                 </div>
 
-                {/* Address with call & navigate buttons */}
+                {/* Address with modern call/navigate buttons */}
                 {address && (
                   <div className="rounded-xl bg-ink-50 p-3 space-y-2">
                     <div className="flex items-start gap-2">
-                      <MapPin size={15} className="text-brand-600 shrink-0 mt-0.5" />
+                      <MapPin size={15} className="text-indigo-600 shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-ink-800">
                           {address.label} · {address.recipient_name}
@@ -352,25 +367,23 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                       </div>
                     </div>
 
-                    {/* Action buttons for address */}
-                    <div className="flex items-center gap-2 pt-1">
-                      {/* Call button */}
+                    {/* Modern action buttons */}
+                    <div className="flex items-center gap-3 pt-1">
                       <a
                         href={`tel:${address.phone}`}
-                        className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-green-50 text-green-700 text-xs font-bold"
+                        className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-sm font-semibold shadow-sm border border-emerald-100/50 transition hover:shadow-md active:scale-[0.98]"
                       >
-                        <PhoneCall size={15} />
+                        <PhoneCall size={16} className="text-emerald-600" />
                         Call
                       </a>
-                      {/* Navigate button */}
                       {address.latitude && address.longitude && (
                         <a
                           href={`https://www.google.com/maps?q=${address.latitude},${address.longitude}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-sky-50 text-sky-700 text-xs font-bold"
+                          className="flex-1 flex items-center justify-center gap-2 h-11 rounded-full bg-gradient-to-r from-sky-50 to-blue-50 text-sky-700 text-sm font-semibold shadow-sm border border-sky-100/50 transition hover:shadow-md active:scale-[0.98]"
                         >
-                          <Navigation size={15} />
+                          <Navigation size={16} className="text-sky-600" />
                           Navigate
                         </a>
                       )}
@@ -382,7 +395,7 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                 <div className="pt-1">
                   {assignment.status === 'ready_for_pickup' && (
                     <SlideToConfirm
-                      label="Slide to mark picked up"
+                      label="Slide to pick up"
                       onConfirm={() => completeDelivery(assignment.id, 'out_for_delivery')}
                       isLoading={isCurrentProcessing}
                       disabled={isCurrentProcessing}
@@ -390,16 +403,16 @@ export function DeliveryScreen({ onBack }: DeliveryScreenProps) {
                   )}
                   {assignment.status === 'out_for_delivery' && (
                     <SlideToConfirm
-                      label="Slide to mark delivered"
+                      label="Slide to deliver"
                       onConfirm={() => completeDelivery(assignment.id, 'delivered')}
                       isLoading={isCurrentProcessing}
                       disabled={isCurrentProcessing}
                     />
                   )}
                   {assignment.status === 'delivered' && (
-                    <div className="h-12 rounded-xl bg-brand-50 text-brand-700 text-sm font-bold flex items-center justify-center gap-2">
-                      <CheckCircle2 size={20} />
-                      Delivered
+                    <div className="h-14 rounded-2xl bg-green-50 text-green-700 text-sm font-bold flex items-center justify-center gap-2 border border-green-200/50">
+                      <CheckCircle2 size={22} />
+                      Delivered ✓
                     </div>
                   )}
                 </div>
