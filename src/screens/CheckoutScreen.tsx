@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ArrowLeft, MapPin, Tag, Truck, Loader as Loader2, CircleCheck as CheckCircle2, CreditCard, Banknote, AlertCircle, X } from 'lucide-react';
 import type { useCart } from '@/store';
 import type { DbAddress } from '@/services/catalog';
@@ -16,6 +16,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'razorpay'>('cod');
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [paymentAlertMsg, setPaymentAlertMsg] = useState('');
+  const keepAliveIntervalRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     const data = await fetchAddresses();
@@ -32,6 +33,47 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
   const deliveryFee = cart.subtotal >= 2000 ? 0 : 80;
   const total = cart.subtotal + deliveryFee;
 
+  // beforeunload handler to cancel on tab close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionStorage.getItem('active_checkout') === 'true') {
+        const orderId = sessionStorage.getItem('checkout_order_id');
+        if (orderId) {
+          // Use the edge function URL – adjust if needed
+          fetch('/api/razorpay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'cancel_order', order_id: orderId }),
+            keepalive: true,
+          }).catch(() => {});
+        }
+        sessionStorage.removeItem('active_checkout');
+        sessionStorage.removeItem('checkout_order_id');
+        sessionStorage.removeItem('checkout_start_time');
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  const startKeepAlive = (orderId: string) => {
+    if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current);
+    keepAliveIntervalRef.current = window.setInterval(async () => {
+      try {
+        await supabase.functions.invoke('razorpay', {
+          body: { action: 'keep_alive', order_id: orderId }
+        });
+      } catch (e) { /* silent fail */ }
+    }, 5 * 60 * 1000); // every 5 minutes
+  };
+
+  const stopKeepAlive = () => {
+    if (keepAliveIntervalRef.current) {
+      clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+    }
+  };
+
   const handlePlaceOrder = async () => {
     if (!selectedAddr) { setError('Please select a delivery address.'); return; }
     setPlacing(true);
@@ -40,6 +82,10 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
       const items = cart.items.map((i) => ({ product_id: i.product.id, quantity: i.quantity }));
       const orderId = await placeOrder(selectedAddr, items);
       if (!orderId) throw new Error('Order failed');
+
+      sessionStorage.setItem('checkout_order_id', orderId);
+      sessionStorage.setItem('active_checkout', 'true');
+      sessionStorage.setItem('checkout_start_time', Date.now().toString());
 
       if (paymentMethod === 'razorpay') {
         const { data: payData, error: payErr } = await supabase.functions.invoke('razorpay', {
@@ -50,19 +96,26 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
           setPaymentAlertMsg('Payment setup failed. Your order was cancelled and items remain in your cart.');
           setShowPaymentAlert(true);
           setPlacing(false);
+          sessionStorage.removeItem('active_checkout');
+          sessionStorage.removeItem('checkout_order_id');
           return;
         }
 
-        if (typeof window === 'undefined' || !(window as unknown as Record<string, unknown>).Razorpay) {
+        if (typeof window === 'undefined' || !(window as any).Razorpay) {
           await supabase.functions.invoke('razorpay', { body: { action: 'cancel_order', order_id: orderId } });
           setPaymentAlertMsg('Online payment is not available right now. Please try again or use cash on delivery.');
           setShowPaymentAlert(true);
           setPlacing(false);
+          sessionStorage.removeItem('active_checkout');
+          sessionStorage.removeItem('checkout_order_id');
           return;
         }
 
-        const Razorpay = (window as unknown as Record<string, unknown>).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
+        const Razorpay = (window as any).Razorpay as new (opts: Record<string, unknown>) => { open: () => void };
         let paymentSucceeded = false;
+
+        // Start keep-alive pings
+        startKeepAlive(orderId);
 
         const rzp = new Razorpay({
           key: payData.key_id,
@@ -72,6 +125,7 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
           description: 'Wholesale order',
           handler: async (response: { razorpay_payment_id: string; razorpay_signature: string }) => {
             try {
+              stopKeepAlive();
               const verification = await supabase.functions.invoke('razorpay', {
                 body: { action: 'verify_payment', order_id: orderId, payment_id: response.razorpay_payment_id, signature: response.razorpay_signature },
               });
@@ -79,9 +133,13 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
                 setPaymentAlertMsg('Payment could not be verified. Your order is on hold — please contact support.');
                 setShowPaymentAlert(true);
                 setPlacing(false);
+                sessionStorage.removeItem('active_checkout');
+                sessionStorage.removeItem('checkout_order_id');
                 return;
               }
               paymentSucceeded = true;
+              sessionStorage.removeItem('active_checkout');
+              sessionStorage.removeItem('checkout_order_id');
               await clearCartItems(cart.cartId ?? '');
               cart.clearCart();
               onOrderPlaced(orderId);
@@ -89,15 +147,20 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
               setPaymentAlertMsg('Payment verification failed. Please contact support before trying again.');
               setShowPaymentAlert(true);
               setPlacing(false);
+              sessionStorage.removeItem('active_checkout');
+              sessionStorage.removeItem('checkout_order_id');
             }
           },
           modal: {
             ondismiss: () => {
+              stopKeepAlive();
               if (!paymentSucceeded) {
                 void supabase.functions.invoke('razorpay', { body: { action: 'cancel_order', order_id: orderId } });
                 setPaymentAlertMsg('Payment was cancelled. Your order was not placed and items remain in your cart.');
                 setShowPaymentAlert(true);
                 setPlacing(false);
+                sessionStorage.removeItem('active_checkout');
+                sessionStorage.removeItem('checkout_order_id');
               }
             },
           },
@@ -105,12 +168,28 @@ export function CheckoutScreen({ cart, onBack, onOrderPlaced, onAddAddress }: Ch
         });
         rzp.open();
       } else {
+        // COD – create a payment record
+        const { error: payError } = await supabase
+          .from('payments')
+          .insert({
+            order_id: orderId,
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            provider: 'cod',
+            amount: total,
+            status: 'pending'
+          });
+        if (payError) throw new Error('Could not record payment method');
+        sessionStorage.removeItem('active_checkout');
+        sessionStorage.removeItem('checkout_order_id');
         await clearCartItems(cart.cartId ?? '');
         cart.clearCart();
         onOrderPlaced(orderId);
       }
     } catch (err) {
       setError('Could not place order. Please try again.');
+      sessionStorage.removeItem('active_checkout');
+      sessionStorage.removeItem('checkout_order_id');
+      stopKeepAlive();
     }
     setPlacing(false);
   };
